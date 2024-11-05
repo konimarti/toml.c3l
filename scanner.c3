@@ -213,11 +213,6 @@ fn Object*! Scanner.parse_value(&self)
 	{
 		case '"':
 		case '\'':
-			/*
-			self.read_byte()!;
-			s = self.read_until_char(c)!;
-			self.read_byte()!;
-			*/
 			s = self.read_quoted_string()!;
 			String str = s.copy_str(self.allocator);
 			return object::new_string(str, self.allocator);
@@ -300,7 +295,11 @@ fn Object*! Scanner.parse_value(&self)
 			while LOOP: (1)
 			{
 				c = self.peek()!;
-				if (is_ws(c) || is_newline(c)) break LOOP;
+
+				String str = s.str_view();
+				if (is_ws(c) && !str.contains(":") && !str.contains("-")) break LOOP;
+				if (is_newline(c)) break LOOP;
+
 				switch (c)
 				{
 				 case '#':
@@ -359,7 +358,7 @@ fn StringList! Scanner.parse_key(&self)
 			}
 			else
 			{
-				io::printfn("line %d: empty key", self.line);
+				// io::printfn("line %d: empty line", self.line);
 			}
 			s.free();
 			break LOOP;
@@ -384,7 +383,7 @@ fn StringList! Scanner.parse_key(&self)
 			}
 			else
 			{
-				io::printfn("line %d: empty key", self.line);
+				// io::printfn("line %d: empty key", self.line);
 			}
 			s.clear();
 			self.skip_ws()!;
@@ -414,7 +413,7 @@ fn void! Scanner.parse_keyval(&self, Object *obj)
 	StringList key = self.parse_key()!;
 
 	if (key.len() == 0) {
-		io::printn("empty keys..");
+		// io::printn("empty keys..");
 		return;
 	}
 
@@ -432,24 +431,30 @@ fn void! Scanner.parse_keyval(&self, Object *obj)
 	self.add_keyval(obj, key, val)!;
 }
 
-fn Object*! Scanner.create_table(&self, StringList tables, Object *cur)
+fn Object*! Scanner.create_table(&self, StringList tables, Object *cur, bool array = false)
 {
 	foreach(table : tables)
 	{
 		if (cur.has_key(table)) {
-			io::printfn("found table: %s", table);
+			io::printfn(" -- found table : %s", table);
 		} else {
-			io::printfn("create new table: %s", table);
+			io::printfn(" -- create table: %s", table);
 			Object* new_table = object::new_obj(self.allocator);
 			cur.set(table, new_table);
 		}
 		cur = cur.get(table)!;
+	}
+	if (array) cur.push_object(object::new_obj(self.allocator));
+	if (cur.is_array()) {
+		return cur.get_at(cur.get_len()-1);
 	}
 	return cur;
 }
 
 fn Object*! Scanner.parse_table(&self, Object *obj)
 {
+	bool is_array = false;
+
 	char c;
 	c = self.read_byte()!;
 	if (c != '[') {
@@ -457,16 +462,32 @@ fn Object*! Scanner.parse_table(&self, Object *obj)
 		return IoError.GENERAL_ERROR?;
 	}
 
-	// key is a list of table
-	StringList key = self.parse_key()!;
+	if (try p = self.peek())
+	{
+		is_array = p == '[';
+		if (is_array)
+		{
+			self.read_byte()!;
+		}
+	}
 
-	Object *cur = self.create_table(key, obj)!;
+	StringList key = self.parse_key()!;
+	Object *cur = self.create_table(key, obj, is_array)!;
 
 	self.skip_ws()!;
 	c = self.read_byte()!;
 	if (c != ']') {
 		io::printfn("expected ']' but got %c", self.peek()!);
 		return IoError.GENERAL_ERROR?;
+	}
+
+	if (is_array)
+	{
+		c = self.read_byte()!;
+		if (c != ']') {
+			io::printfn("expected ']' but got %c", self.peek()!);
+			return IoError.GENERAL_ERROR?;
+		}
 	}
 
 	return cur;
