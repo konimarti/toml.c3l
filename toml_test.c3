@@ -28,7 +28,7 @@ fn void! test_lexer() @test
 fn void! test_scanner() @test
 {
 	toml::scanner::Scanner scan;	
-	scan.init(ByteReader{}.init("shipping.cost={boat=100.0, cabin=0xdead, sell=true}\n[basket]\nfruit.apply.color = [1.2, 'literal', \"quotedstring\",true, [1#shesd\n,2\n # comment\n,3,]] \n"), allocator::temp());
+	scan.init(ByteReader{}.init("shipping.cost={boat=100.0, ml=\"\"\"\nhello\nworld\"\"\"\"\", cabin=0xdead, sell=true}\n[basket]\nfruit.apply.color = [1.2, 'literal', \"quotedstring\",true, [1#shesd\n,2\n # comment\n,3,]] \n"), allocator::temp());
 
 	io::printn("scanner:");
 

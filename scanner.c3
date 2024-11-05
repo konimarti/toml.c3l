@@ -149,9 +149,23 @@ fn DString! Scanner.read_quoted_string(&self)
 	suffix.append_char(quote);
 	if (ml) suffix.append_repeat(quote, 2);
 
+	if (ml)
+	{
+		switch (self.peek()!)
+		{
+			case 0x0D:
+				self.read_byte()!;
+				nextcase;
+			case 0x0A:
+				self.read_byte()!;
+		}
+	}
+
+
 	DString s;
 	s.new_init(16, self.allocator);
 	char! c;
+	bool more;
 	while LOOP: (1)
 	{ 
 		c = self.read_byte();
@@ -160,7 +174,12 @@ fn DString! Scanner.read_quoted_string(&self)
 			if (err == IoError.EOF) return IoError.UNEXPECTED_EOF?;
 			return err?;
 		}
-		if (s.str_view().ends_with(suffix.str_view())) {
+		more = false;
+		if (try p = self.peek())
+		{
+			more = p == quote;
+		}
+		if (!more && s.str_view().ends_with(suffix.str_view())) {
 			s.delete(s.len() - suffix.len(), suffix.len());
 			break LOOP;
 		}
@@ -296,7 +315,7 @@ fn Object*! Scanner.parse_value(&self)
 			String str = s.copy_str(self.allocator);
 			if (str.len == 0) return object::new_null();
 
-			io::printfn("convertin string '%s'", str);
+			// io::printfn("convertin string '%s'", str);
 
 			int! i = str.to_int();
 			if (try i)
@@ -305,14 +324,13 @@ fn Object*! Scanner.parse_value(&self)
 			}
 			if (catch err = i)
 			{
-				io::printfn("convertin to int failed: %s", err);
+				// io::printfn("convertin to int failed: %s", err);
 			}
 
 			double! f = str.to_double();
 			if (try f) return object::new_float(f, self.allocator);
 
 			// TODO: read date-time
-			// TODO: multiline strings
 
 			return object::new_string(str, self.allocator);
 	}
