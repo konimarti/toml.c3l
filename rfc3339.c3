@@ -34,8 +34,8 @@ import std::io;
 fault Error
 {
 	INVALID_DATE_FORMAT,
+	INVALID_INPUT,
 	INVALID_NUMBER,
-	INVALID_INPUT_LENGTH
 }
 
 struct Date
@@ -47,13 +47,13 @@ struct Date
 
 fn void! Date.parse(&d, Parser* p)
 {
-	if (p.s.len < 10) return Error.INVALID_INPUT_LENGTH?;
+	if (p.s.len < 10) return Error.INVALID_INPUT?;
 
 	d.year = p.cut(4)!;
-	if (p.peek() == '-') p.consume('-');
+	p.consume('-')!;
 
 	d.month = p.cut(2)!;
-	if (p.peek() == '-') p.consume('-');
+	p.consume('-')!;
 
 	d.day = p.cut(2)!;
 }
@@ -69,13 +69,13 @@ struct Time
 
 fn void! Time.parse(&t, Parser* p)
 {
-	if (p.s.len < 8) return Error.INVALID_INPUT_LENGTH?;
+	if (p.s.len < 8) return Error.INVALID_INPUT?;
 
 	t.hour = p.cut(2)!;
-	if (p.peek() == ':') p.consume(':');
+	p.consume(':')!;
 
 	t.min = p.cut(2)!;
-	if (p.peek() == ':') p.consume(':');
+	p.consume(':')!;
 
 	t.sec = p.cut(2)!;
 
@@ -84,7 +84,10 @@ fn void! Time.parse(&t, Parser* p)
 		// TODO: read sec-frac
 	}
 
-	if (!p.empty() && p.peek() == 'Z') t.utc = p.consume('Z');
+	if (try p.consume('Z'))
+	{
+		t.utc = true;
+	}
 }
 
 struct Offset
@@ -95,9 +98,9 @@ struct Offset
 
 fn void! Offset.parse(&o, Parser* p)
 {
-	if (p.s.len < 6) return Error.INVALID_INPUT_LENGTH?;
+	if (p.s.len < 6) return Error.INVALID_INPUT?;
 	o.hour = p.cut(3)!;
-	if (p.peek() == ':') p.consume(':');
+	if (p.peek() == ':') p.consume(':')!;
 	o.min = p.cut(2)!;
 }
 
@@ -113,7 +116,7 @@ fn DateTime! parse(String s)
 	Date d;
 	d.parse(&p)!;
 
-	if (p.peek() == ' ' || p.peek() == 'T') p.consume(p.peek());
+	if (p.peek() == ' ' || p.peek() == 'T') p.consume(p.peek())!;
 
 	Time t;
 	t.parse(&p)!;
@@ -149,6 +152,11 @@ fn void! test_parse_date_time() @test
 
 module toml::rfc3339::parser;
 
+fault ParserError
+{
+	INVALID_LENGTH,
+	UNEXPECTED_CHAR,
+}
 
 struct Parser
 {
@@ -165,23 +173,43 @@ fn char Parser.peek(&p)
 	return p.s[0];
 }
 
-fn bool Parser.consume(&p, char c)
+fn void! Parser.consume(&p, char c)
 {
-	if (p.empty() || p.peek() != c) return false;
+	if (p.empty() || p.peek() != c) return ParserError.UNEXPECTED_CHAR?;
 	p.s = p.s[1..];
-	return true;
 }
 
 fn int! Parser.cut(&p, usz n)
 {
-	if (p.s.len < n) return Error.INVALID_INPUT_LENGTH?;
+	/*
+	if (p.s.len < n) return ParserError.INVALID_LENGTH?;
 	int i = (p.s[:n]).to_int()!;
 	p.s = p.s[n..];
+	return i;
+	*/
+
+	int i;
+	char c;
+	DString s;
+	@pool() {
+		s.temp_init();
+		while LOOP: (!p.empty())
+		{
+			c = p.peek();
+			if (!c.is_digit()) break LOOP;
+			s.append_char(c);
+			p.consume(c)!;
+		}
+		i = s.str_view().to_int()!;
+	};
 	return i;
 }
 
 fn void Parser.skipSpace(&p)
 {
-	while (p.s.len && (p.s[0] == ' ' || p.s[0] == '\t')) p.s = p.s[1..];
+	while (p.s.len && (p.s[0] == ' ' || p.s[0] == '\t'))
+	{
+		p.s = p.s[1..];
+	}
 }
 
