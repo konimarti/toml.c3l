@@ -60,7 +60,6 @@ fn void! test_parser_toml_doc() @test
 
 fn void! parser_read_quoted_str() @test
 {
-	/*
 	DString s;
 	s.new_init();
 	toml::parser::Parser{}.init(
@@ -68,7 +67,30 @@ fn void! parser_read_quoted_str() @test
 		allocator::temp(),
 	).read_quoted_string(&s)!;
 
-	assert(s.str_view() == "quoted\"string");
+	String want = "quoted\"string";
+	assert(s.str_view() == want, "got: %s, but want: %s", s.str_view(), want);
 	s.free();
-	*/
+}
+
+fn void! parser_array_tables() @test
+{
+	DString s;
+	s.new_init();
+	toml::parser::Parser p;
+	p.init(
+		ByteReader{}.init(`
+		[[product]]
+		widget.color = "green"
+		widget.price = 3.14
+		[[product]]
+		[[product]]
+		widget.color = "blue"
+		widget.price = 2.71
+		`),
+		allocator::temp(),
+	);
+
+	Object* obj = p.toml()!;
+	io::printn(obj);
+	assert(obj.get("product")!.get_len() == 3, "not enough elements in array");
 }

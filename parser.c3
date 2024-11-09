@@ -91,87 +91,27 @@ fn void! Parser.skip_ws_comment_newline(&self)
 }
 
 
-fn DString! Parser.read_until_char(&self, char stop)
+fn void! Parser.read_until_char(&self, char stop, DString *s)
 {
-	DString s;
-	s.new_init(16, self.allocator);
-
-	char! c;
+	char c;
 	while LOOP: (1)
 	{ 
-		c = self.read_byte();
-		if (catch err = c) 
+		c = self.read_byte()!;
+		switch (c) 
 		{
-			if (err == IoError.EOF) return IoError.UNEXPECTED_EOF?;
-			return err?;
+			case '\\':
+				c = self.read_byte()!;
+			case stop: 
+				break LOOP;
 		}
-		if (c == stop) break LOOP;
 		s.append_char(c);
 	}
-	return s;
 }
 
 fn void! Parser.read_quoted_string(&self, DString *s)
 {
 	char quote = self.read_byte()!;
-	bool ml = false;
-
-	if (try self.peek()!)
-	{
-		if (self.peek()! == quote)
-		{
-			self.read_byte()!;
-			if (try self.peek()!)
-			{
-				if (self.peek()! == quote)
-				{
-					self.read_byte()!;
-					ml = true;
-				}
-			}
-		}
-			
-	}
-
-	DString suffix;
-	defer { suffix.free(); }
-	suffix.new_init(3, self.allocator);
-	suffix.append_char(quote);
-	if (ml) suffix.append_repeat(quote, 2);
-
-	if (ml)
-	{
-		switch (self.peek()!)
-		{
-			case 0x0D:
-				self.read_byte()!;
-				nextcase;
-			case 0x0A:
-				self.read_byte()!;
-		}
-	}
-
-	char! c;
-	bool more;
-	while LOOP: (1)
-	{ 
-		c = self.read_byte();
-		if (catch err = c) 
-		{
-			if (err == IoError.EOF) return IoError.UNEXPECTED_EOF?;
-			return err?;
-		}
-		more = false;
-		if (try p = self.peek())
-		{
-			more = p == quote;
-		}
-		if (!more && s.str_view().ends_with(suffix.str_view())) {
-			s.delete(s.len() - suffix.len(), suffix.len());
-			break LOOP;
-		}
-		s.append_char(c);
-	}
+	self.read_until_char(quote, s)!;
 }
 
 fn bool! Parser.match(&self, String str)
@@ -201,7 +141,6 @@ fn Object*! Parser.parse_value(&self)
 			self.read_quoted_string(&s)!;
 			return object::new_string(s.str_view(), self.allocator);
 		case 't':
-			self.unread_byte();
 			if (self.match("true")!)
 			{
 				return object::new_bool(true);
@@ -209,7 +148,6 @@ fn Object*! Parser.parse_value(&self)
 			io::printfn("line %d: expected value 'true' but did not match", self.line);
 			return object::new_null();
 		case 'f':
-			self.unread_byte();
 			if (self.match("false")!)
 			{
 				return object::new_bool(false);
@@ -217,8 +155,6 @@ fn Object*! Parser.parse_value(&self)
 			io::printfn("line %d: expected value 'false' but did not match", self.line);
 			return object::new_null();
 		case 'i':
-			// FIXME: probably not needed; handled with to_float()
-			self.unread_byte();
 			if (self.match("inf")!)
 			{
 				return object::new_float(float.inf, self.allocator);
@@ -226,8 +162,6 @@ fn Object*! Parser.parse_value(&self)
 			io::printfn("line %d: expected value 'inf' but did not match", self.line);
 			return object::new_null();
 		case 'n':
-			// FIXME: probably not needed; handled with to_float()
-			self.unread_byte();
 			if (self.match("nan")!)
 			{
 				return object::new_float(float.nan, self.allocator);
@@ -362,7 +296,7 @@ fn StringList! Parser.parse_key(&self)
 
 		if (c == '"' || c == '\'') {
 			self.read_byte()!;
-			s = self.read_until_char(c)!;
+			self.read_until_char(c, &s)!;
 			continue;
 		}
 
@@ -436,11 +370,13 @@ fn Object*! Parser.create_table(&self, StringList tables, Object *cur, bool arra
 		} else {
 			io::printfn(" -- create table: %s", table);
 			Object* new_table = object::new_obj(self.allocator);
-			cur.set(table.copy(self.allocator), new_table);
+			cur.set(table, new_table);
 		}
 		cur = cur.get(table)!;
 	}
-	if (array) cur.push_object(object::new_obj(self.allocator));
+	if (array) {
+		cur.push_object(object::new_obj(self.allocator));
+	}
 	if (cur.is_array()) {
 		return cur.get_at(cur.get_len()-1);
 	}
@@ -515,6 +451,7 @@ fn void! Parser.expr(&self, Object *obj)
 	{
 		case '#':
 			self.skip_line()!;
+			self.line++;
 		case 0x0D:
 			self.read_byte()!;
 			self.read_byte()!;
