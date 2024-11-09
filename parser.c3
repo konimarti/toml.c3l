@@ -1,7 +1,6 @@
 module toml::parser;
 
 import std::io;
-import std::time;
 import std::collections::object;
 import std::collections::list;
 
@@ -19,9 +18,10 @@ struct Parser
 	Object* table;
 }
 
-fn void Parser.init(&self, InStream s, Allocator allocator)
+fn Parser* Parser.init(&self, InStream s, Allocator allocator)
 {
 	*self = {s, allocator, false, '\0', 1, null};
+	return self;
 }
 
 fn char! Parser.read_byte(&self)
@@ -90,20 +90,6 @@ fn void! Parser.skip_ws_comment_newline(&self)
 	}
 }
 
-
-fn Object*! Parser.toml(&self)
-{
-	Object* obj = object::new_obj(self.allocator);
-	self.table = obj;
-	while LOOP: (1) {
-		if (catch err = self.expr(obj))
-		{
-			if (err == IoError.EOF) break LOOP;
-			return err?;
-		}
-	}
-	return obj;
-}
 
 fn DString! Parser.read_until_char(&self, char stop)
 {
@@ -220,25 +206,37 @@ fn Object*! Parser.parse_value(&self)
 			String str = s.copy_str(self.allocator);
 			return object::new_string(str, self.allocator);
 		case 't':
+			self.unread_byte();
 			if (self.match("true")!)
 			{
 				return object::new_bool(true);
 			}
-			else
-			{
-				io::printfn("line %d: expected value 'true' but did not match", self.line);
-				return object::new_null();
-			}
+			io::printfn("line %d: expected value 'true' but did not match", self.line);
+			return object::new_null();
 		case 'f':
+			self.unread_byte();
 			if (self.match("false")!)
 			{
 				return object::new_bool(false);
 			}
-			else
+			io::printfn("line %d: expected value 'false' but did not match", self.line);
+			return object::new_null();
+		case 'i':
+			self.unread_byte();
+			if (self.match("inf")!)
 			{
-				io::printfn("line %d: expected value 'false' but did not match", self.line);
-				return object::new_null();
+				return object::new_float(float.inf, self.allocator);
 			}
+			io::printfn("line %d: expected value 'inf' but did not match", self.line);
+			return object::new_null();
+		case 'n':
+			self.unread_byte();
+			if (self.match("nan")!)
+			{
+				return object::new_float(float.nan, self.allocator);
+			}
+			io::printfn("line %d: expected value 'inf' but did not match", self.line);
+			return object::new_null();
 		case '[':
 			// consume '['
 			self.read_byte()!; 
@@ -529,4 +527,17 @@ fn void! Parser.expr(&self, Object *obj)
 	}
 }
 
+fn Object*! Parser.toml(&self)
+{
+	Object* obj = object::new_obj(self.allocator);
+	self.table = obj;
+	while LOOP: (1) {
+		if (catch err = self.expr(obj))
+		{
+			if (err == IoError.EOF) break LOOP;
+			return err?;
+		}
+	}
+	return obj;
+}
 
