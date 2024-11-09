@@ -338,6 +338,7 @@ fn StringList! Parser.parse_key(&self)
 
 	DString s;
 	s.new_init(16, self.allocator);
+	defer { s.free(); }
 
 	char c;
 	while LOOP: (1)
@@ -346,15 +347,16 @@ fn StringList! Parser.parse_key(&self)
 
 		if (c == '=' || c == ']' || c == '\n' || c == '#') {
 			self.unread_byte();
-			String str = s.str_view();
-			if (str.len > 0)
+			String key = s.copy_str(self.allocator);
+			if (key.len > 0)
 			{
-				list.push(str.copy(self.allocator));
+				list.push(key);
 			}
 			else
 			{
 				// io::printfn("line %d: empty line", self.line);
 			}
+			s.clear();
 			break LOOP;
 		}
 
@@ -386,7 +388,6 @@ fn StringList! Parser.parse_key(&self)
 		}
 	}
 
-	s.free();
 	return list;
 }
 
@@ -406,11 +407,7 @@ fn void! Parser.parse_keyval(&self, Object *obj)
 {
 	// key is a list of table
 	StringList key = self.parse_key()!;
-	defer {
-		foreach (k : key) k.free();
-		key.free();
-	}
-
+	defer { key.free(); }
 	if (key.len() == 0) {
 		// io::printn("empty keys..");
 		return;
@@ -471,10 +468,7 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 	}
 
 	StringList key = self.parse_key()!;
-	defer {
-		foreach (k : key) k.free();
-		key.free();
-	}
+	defer { key.free(); }
 	Object *cur = self.create_table(key, obj, is_array)!;
 
 	self.skip_ws()!;
