@@ -1,4 +1,4 @@
-module toml;
+module toml::lexer;
 import std::io;
 import std::collections::object;
 

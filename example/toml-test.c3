@@ -5,7 +5,7 @@ import toml;
 
 fn void! main()
 {
-	toml::scanner::Scanner scan;	
-	scan.init(io::stdin(), allocator::temp());
-	io::printn(scan.toml()!!);
+	toml::parser::Parser p;	
+	p.init(io::stdin(), allocator::temp());
+	io::printn(p.toml()!!);
 }

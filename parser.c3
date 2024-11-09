@@ -1,12 +1,15 @@
-module toml::scanner;
+module toml::parser;
 
 import std::io;
+import std::time;
 import std::collections::object;
 import std::collections::list;
 
+import toml::rfc3339;
+
 def StringList = List(<String>);
 
-struct Scanner
+struct Parser
 {
 	InStream s;
 	Allocator allocator;
@@ -16,12 +19,12 @@ struct Scanner
 	Object* table;
 }
 
-fn void Scanner.init(&self, InStream s, Allocator allocator)
+fn void Parser.init(&self, InStream s, Allocator allocator)
 {
 	*self = {s, allocator, false, '\0', 1, null};
 }
 
-fn char! Scanner.read_byte(&self)
+fn char! Parser.read_byte(&self)
 {
 	if (self.unread)
 	{
@@ -32,12 +35,12 @@ fn char! Scanner.read_byte(&self)
 	return self.current;
 }
 
-fn void Scanner.unread_byte(&self)
+fn void Parser.unread_byte(&self)
 {
 	self.unread = true; 
 }
 
-fn char! Scanner.peek(&self)
+fn char! Parser.peek(&self)
 {
 	if (self.unread)
 	{
@@ -58,13 +61,13 @@ fn bool is_newline(char c)
 	return (c == 0x0A || c == 0x0D);
 }
 
-fn void! Scanner.skip_ws(&self)
+fn void! Parser.skip_ws(&self)
 {
 	char c;
 	while ((c = self.peek()!) && is_ws(c)) self.read_byte()!;
 }
 
-fn void! Scanner.skip_line(&self)
+fn void! Parser.skip_line(&self)
 {
 	char c;
 	do {
@@ -73,7 +76,7 @@ fn void! Scanner.skip_line(&self)
 	while (c != 0x0A);
 }
 
-fn void! Scanner.skip_ws_comment_newline(&self)
+fn void! Parser.skip_ws_comment_newline(&self)
 {
 	char c = self.peek()!;
 	switch
@@ -88,7 +91,7 @@ fn void! Scanner.skip_ws_comment_newline(&self)
 }
 
 
-fn Object*! Scanner.toml(&self)
+fn Object*! Parser.toml(&self)
 {
 	Object* obj = object::new_obj(self.allocator);
 	self.table = obj;
@@ -102,7 +105,7 @@ fn Object*! Scanner.toml(&self)
 	return obj;
 }
 
-fn DString! Scanner.read_until_char(&self, char stop)
+fn DString! Parser.read_until_char(&self, char stop)
 {
 	DString s;
 	s.new_init(16, self.allocator);
@@ -122,7 +125,7 @@ fn DString! Scanner.read_until_char(&self, char stop)
 	return s;
 }
 
-fn DString! Scanner.read_quoted_string(&self)
+fn DString! Parser.read_quoted_string(&self)
 {
 	char quote = self.read_byte()!;
 	bool ml = false;
@@ -189,7 +192,7 @@ fn DString! Scanner.read_quoted_string(&self)
 	return s;
 }
 
-fn bool! Scanner.match(&self, String str)
+fn bool! Parser.match(&self, String str)
 {
 	char c;
 	foreach (s : str)
@@ -201,7 +204,7 @@ fn bool! Scanner.match(&self, String str)
 	return true;
 }
 
-fn Object*! Scanner.parse_value(&self)
+fn Object*! Parser.parse_value(&self)
 {
 	self.skip_ws()!;
 
@@ -314,7 +317,7 @@ fn Object*! Scanner.parse_value(&self)
 			String str = s.copy_str(self.allocator);
 			if (str.len == 0) return object::new_null();
 
-			// io::printfn("convertin string '%s'", str);
+			// io::printfn("converting string '%s'", str);
 
 			int! i = str.to_int();
 			if (try i)
@@ -323,20 +326,18 @@ fn Object*! Scanner.parse_value(&self)
 			}
 			if (catch err = i)
 			{
-				// io::printfn("convertin to int failed: %s", err);
+				// io::printfn("conversion to int failed: %s", err);
 			}
 
 			double! f = str.to_double();
 			if (try f) return object::new_float(f, self.allocator);
-
-			// TODO: read date-time
 
 			return object::new_string(str, self.allocator);
 	}
 }
 
 
-fn StringList! Scanner.parse_key(&self)
+fn StringList! Parser.parse_key(&self)
 {
 	StringList list;
 	list.new_init(6, self.allocator);
@@ -395,7 +396,7 @@ fn StringList! Scanner.parse_key(&self)
 	return list;
 }
 
-fn void! Scanner.add_keyval(&self, Object *obj, StringList k, Object* v)
+fn void! Parser.add_keyval(&self, Object *obj, StringList k, Object* v)
 {
 	if (k.len() == 0)
 	{
@@ -407,7 +408,7 @@ fn void! Scanner.add_keyval(&self, Object *obj, StringList k, Object* v)
 	cur.set(key, v);
 }
 
-fn void! Scanner.parse_keyval(&self, Object *obj)
+fn void! Parser.parse_keyval(&self, Object *obj)
 {
 	// key is a list of table
 	StringList key = self.parse_key()!;
@@ -431,7 +432,7 @@ fn void! Scanner.parse_keyval(&self, Object *obj)
 	self.add_keyval(obj, key, val)!;
 }
 
-fn Object*! Scanner.create_table(&self, StringList tables, Object *cur, bool array = false)
+fn Object*! Parser.create_table(&self, StringList tables, Object *cur, bool array = false)
 {
 	foreach(table : tables)
 	{
@@ -451,7 +452,7 @@ fn Object*! Scanner.create_table(&self, StringList tables, Object *cur, bool arr
 	return cur;
 }
 
-fn Object*! Scanner.parse_table(&self, Object *obj)
+fn Object*! Parser.parse_table(&self, Object *obj)
 {
 	bool is_array = false;
 
@@ -493,7 +494,7 @@ fn Object*! Scanner.parse_table(&self, Object *obj)
 	return cur;
 }
 
-fn void! Scanner.expr(&self, Object *obj)
+fn void! Parser.expr(&self, Object *obj)
 {
 	char c;
 
