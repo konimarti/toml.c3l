@@ -111,7 +111,7 @@ fn DString! Parser.read_until_char(&self, char stop)
 	return s;
 }
 
-fn DString! Parser.read_quoted_string(&self)
+fn void! Parser.read_quoted_string(&self, DString *s)
 {
 	char quote = self.read_byte()!;
 	bool ml = false;
@@ -134,6 +134,7 @@ fn DString! Parser.read_quoted_string(&self)
 	}
 
 	DString suffix;
+	defer { suffix.free(); }
 	suffix.new_init(3, self.allocator);
 	suffix.append_char(quote);
 	if (ml) suffix.append_repeat(quote, 2);
@@ -150,9 +151,6 @@ fn DString! Parser.read_quoted_string(&self)
 		}
 	}
 
-
-	DString s;
-	s.new_init(16, self.allocator);
 	char! c;
 	bool more;
 	while LOOP: (1)
@@ -174,8 +172,6 @@ fn DString! Parser.read_quoted_string(&self)
 		}
 		s.append_char(c);
 	}
-
-	return s;
 }
 
 fn bool! Parser.match(&self, String str)
@@ -202,9 +198,8 @@ fn Object*! Parser.parse_value(&self)
 	{
 		case '"':
 		case '\'':
-			s = self.read_quoted_string()!;
-			String str = s.copy_str(self.allocator);
-			return object::new_string(str, self.allocator);
+			self.read_quoted_string(&s)!;
+			return object::new_string(s.str_view(), self.allocator);
 		case 't':
 			self.unread_byte();
 			if (self.match("true")!)
@@ -222,6 +217,7 @@ fn Object*! Parser.parse_value(&self)
 			io::printfn("line %d: expected value 'false' but did not match", self.line);
 			return object::new_null();
 		case 'i':
+			// FIXME: probably not needed; handled with to_float()
 			self.unread_byte();
 			if (self.match("inf")!)
 			{
@@ -230,6 +226,7 @@ fn Object*! Parser.parse_value(&self)
 			io::printfn("line %d: expected value 'inf' but did not match", self.line);
 			return object::new_null();
 		case 'n':
+			// FIXME: probably not needed; handled with to_float()
 			self.unread_byte();
 			if (self.match("nan")!)
 			{
@@ -312,8 +309,7 @@ fn Object*! Parser.parse_value(&self)
 				self.read_byte()!;
 				s.append_char(c);
 			}
-			String str = s.copy_str(self.allocator);
-			if (str.len == 0) return object::new_null();
+			String str = s.str_view();
 
 			// io::printfn("converting string '%s'", str);
 
@@ -350,16 +346,15 @@ fn StringList! Parser.parse_key(&self)
 
 		if (c == '=' || c == ']' || c == '\n' || c == '#') {
 			self.unread_byte();
-			String key = s.copy_str(self.allocator);
-			if (key.len > 0)
+			String str = s.str_view();
+			if (str.len > 0)
 			{
-				list.push(key);
+				list.push(str.copy(self.allocator));
 			}
 			else
 			{
 				// io::printfn("line %d: empty line", self.line);
 			}
-			s.free();
 			break LOOP;
 		}
 
@@ -391,6 +386,7 @@ fn StringList! Parser.parse_key(&self)
 		}
 	}
 
+	s.free();
 	return list;
 }
 
@@ -410,6 +406,10 @@ fn void! Parser.parse_keyval(&self, Object *obj)
 {
 	// key is a list of table
 	StringList key = self.parse_key()!;
+	defer {
+		foreach (k : key) k.free();
+		key.free();
+	}
 
 	if (key.len() == 0) {
 		// io::printn("empty keys..");
@@ -439,7 +439,7 @@ fn Object*! Parser.create_table(&self, StringList tables, Object *cur, bool arra
 		} else {
 			io::printfn(" -- create table: %s", table);
 			Object* new_table = object::new_obj(self.allocator);
-			cur.set(table, new_table);
+			cur.set(table.copy(self.allocator), new_table);
 		}
 		cur = cur.get(table)!;
 	}
@@ -471,6 +471,10 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 	}
 
 	StringList key = self.parse_key()!;
+	defer {
+		foreach (k : key) k.free();
+		key.free();
+	}
 	Object *cur = self.create_table(key, obj, is_array)!;
 
 	self.skip_ws()!;

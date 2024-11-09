@@ -1,9 +1,12 @@
 module app;
 
 import std::io;
+import std::collections::object;
+
 import toml;
 
 fn void! main()
-{
-	io::printn(toml::read_config(io::stdin(), allocator::temp()))!;
+{	Object* cfg = toml::read_config(io::stdin(), allocator::heap())!;
+	defer { cfg.free(); }
+	io::printn(cfg);
 }
