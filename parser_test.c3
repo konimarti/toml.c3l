@@ -57,3 +57,18 @@ fn void! test_parser_toml_doc() @test
 	Object* obj = scan.toml()!;
 	io::printn(obj);
 }
+
+fn void! parser_read_quoted_str() @test
+{
+	/*
+	DString s;
+	s.new_init();
+	toml::parser::Parser{}.init(
+		ByteReader{}.init(`"quoted\"string"rest`),
+		allocator::temp(),
+	).read_quoted_string(&s)!;
+
+	assert(s.str_view() == "quoted\"string");
+	s.free();
+	*/
+}
