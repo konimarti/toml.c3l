@@ -49,13 +49,11 @@ fn void! Date.parse(&d, Parser* p)
 {
 	if (p.s.len < 10) return Error.INVALID_INPUT?;
 
-	d.year = p.cut(4)!;
+	d.year = p.consumeInt()!;
 	p.consume('-')!;
-
-	d.month = p.cut(2)!;
+	d.month = p.consumeInt()!;
 	p.consume('-')!;
-
-	d.day = p.cut(2)!;
+	d.day = p.consumeInt()!;
 }
 
 struct Time
@@ -71,23 +69,19 @@ fn void! Time.parse(&t, Parser* p)
 {
 	if (p.s.len < 8) return Error.INVALID_INPUT?;
 
-	t.hour = p.cut(2)!;
+	t.hour = p.consumeInt()!;
 	p.consume(':')!;
-
-	t.min = p.cut(2)!;
+	t.min = p.consumeInt()!;
 	p.consume(':')!;
-
-	t.sec = p.cut(2)!;
+	t.sec = p.consumeInt()!;
 
 	t.us = 0;
 	if (!p.empty() && p.peek() == '.') {
-		// TODO: read sec-frac
+		p.consume('.')!;
+		t.us = p.consumeInt()!; 
 	}
 
-	if (try p.consume('Z'))
-	{
-		t.utc = true;
-	}
+	if (try p.consume('Z')) t.utc = true;
 }
 
 struct Offset
@@ -99,9 +93,23 @@ struct Offset
 fn void! Offset.parse(&o, Parser* p)
 {
 	if (p.s.len < 6) return Error.INVALID_INPUT?;
-	o.hour = p.cut(3)!;
-	if (p.peek() == ':') p.consume(':')!;
-	o.min = p.cut(2)!;
+
+	int sign;
+	switch (p.peek())
+	{
+		case '+':
+			sign = 1;
+			p.consume('+')!;
+		case '-':
+			sign = -1;
+			p.consume('-')!;
+		default:
+			return;
+	}
+
+	o.hour = sign * p.consumeInt()!;
+	p.consume(':')!;
+	o.min = p.consumeInt()!;
 }
 
 fn int Offset.to_sec(&o)
@@ -179,37 +187,21 @@ fn void! Parser.consume(&p, char c)
 	p.s = p.s[1..];
 }
 
-fn int! Parser.cut(&p, usz n)
+fn int! Parser.consumeInt(&p)
 {
-	/*
-	if (p.s.len < n) return ParserError.INVALID_LENGTH?;
-	int i = (p.s[:n]).to_int()!;
-	p.s = p.s[n..];
-	return i;
-	*/
+	int n, v;
+	while (n < p.s.len && p.s[n].is_digit()) n++;
 
-	int i;
-	char c;
-	DString s;
-	@pool() {
-		s.temp_init();
-		while LOOP: (!p.empty())
-		{
-			c = p.peek();
-			if (!c.is_digit()) break LOOP;
-			s.append_char(c);
-			p.consume(c)!;
-		}
-		i = s.str_view().to_int()!;
-	};
-	return i;
+	if (!n) return ParserError.INVALID_LENGTH?;
+
+	v = p.s[:n].to_int()!;
+	p.s = p.s[n..];
+
+	return v;
 }
 
 fn void Parser.skipSpace(&p)
 {
-	while (p.s.len && (p.s[0] == ' ' || p.s[0] == '\t'))
-	{
-		p.s = p.s[1..];
-	}
+	while (p.s.len && (p.s[0] == ' ' || p.s[0] == '\t')) p.s = p.s[1..];
 }
 
