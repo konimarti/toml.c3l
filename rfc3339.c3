@@ -158,6 +158,18 @@ fn void! test_parse_date_time() @test
 	io::printfn("hour: %4d, min: %2d, sec: %2d", dt.hour, dt.min, dt.sec);
 }
 
+fn void! test_parse_utc() @test
+{
+	String s = "1996-12-19T16:39:57Z";
+	DateTime dt = rfc3339::parse(s)!;
+}
+
+fn void! test_parse_utc_frac() @test
+{
+	String s = "1996-12-19T16:39:57.123456Z";
+	DateTime dt = rfc3339::parse(s)!;
+}
+
 module toml::rfc3339::parser;
 
 fault ParserError
