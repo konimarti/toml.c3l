@@ -6,24 +6,12 @@ import std::collections::object;
 
 fn void! test_lexer() @test
 {
-	Lexer lex;	
-	lex.init(ByteReader{}.init(`
+	TokenList *tokens = Lexer{}.init(`
 	[table]
 	fruit.apply.color = green
-	`), allocator::temp());
+	`, allocator::temp()).scan_tokens()!;
+	defer tokens.free();
 
 	io::printn("lexer:");
-	while LOOP: (1)
-	{
-		Token*! tok = lex.next_token();
-		if (catch err = tok)
-		{
-			if (err == IoError.EOF) {
-				io::printn(">> EOF received");
-				break LOOP;
-			}
-			return err?;
-		}
-		io::print(tok);
-	}
+	foreach (tok : tokens) io::print(tok);
 }

@@ -1,6 +1,9 @@
 module toml::lexer;
 import std::io;
 import std::collections::object;
+import std::collections::list;
+
+def TokenList = List(<Token>);
 
 fault Errors {
 	GENERL_ERROR,
@@ -11,6 +14,7 @@ fault Errors {
 enum TokenType @local
 {
 	// single-char token
+	EOF,
 	NEWLINE,
 	LBRACE,
 	RBRACE,
@@ -19,28 +23,30 @@ enum TokenType @local
 	COMMA,
 	PLUS,
 	MINUS,
-	DOT,
+	PERIOD,
 	EQUAL,
 
-	// multiple-char tokens
-	NUMBER,
-	STRING,
-	TRUE,
-	FALSE,
-	INF,
-	NAN,
+	// literals
+	COMMENT,
+	STRING, // [ml-]basic-string, [ml-]literal-string 
+	INTEGER, // dec, hx, oct, bin
+	FLOAT, // infinity, nan
+	BOOLEAN, // true, false
+	DATETIME,
 }
 
 struct Token (Printable)
 {
 	TokenType type;
 	String lexeme;
+	Object *literal;
+	int line;
 }
 
 fn usz! Token.to_format(&self, Formatter* f) @dynamic
 {
-	usz n = f.printf("-- tok: %s", self.type)!;
-	if (self.lexeme.len) {
+	usz n = f.printf("-- line: %d tok: %8s", self.line, self.type)!;
+	if (self.lexeme.trim().len) {
 		n += f.printf(" lexeme: %s", self.lexeme)!;
 	}
 	n += f.printf("\n")!;
@@ -49,280 +55,182 @@ fn usz! Token.to_format(&self, Formatter* f) @dynamic
 
 struct Lexer
 {
-	InStream s;
+	String s;
 	Allocator allocator;
-	bool unread;
-	char current;
+	TokenList *tokens;
+	bool scan_value;
+	int start;
+	int current;
+	int line;
 }
 
-fn void Lexer.init(&self, InStream s, Allocator allocator)
+fn Lexer* Lexer.init(&self, String s, Allocator allocator)
 {
-	*self = {s, allocator, false, '\0'};
+	TokenList *tokens = allocator::new(allocator, TokenList);
+	*self = {s, allocator, tokens.new_init(16, allocator), false, 0, 0, 1};
+	return self;
 }
 
-fn Token* Lexer.token(&self, TokenType type)
+fn void Lexer.free(&self)
 {
-	Token *tok = allocator::new(self.allocator, Token);
-	tok.type = type;
-	return tok;
+	// FIXME: we need to free the token.literals, too
+	if (self.tokens) self.tokens.free();
 }
 
-fn Token* Lexer.token_with_lexeme(&self, TokenType type, String lexeme)
+fn bool Lexer.at_end(&self)
 {
-	Token *tok = self.token(type);
-	tok.lexeme = lexeme;
-	return tok;
+	return self.current >= self.s.len; 
 }
 
-
-fn char! Lexer.read_byte(&self)
+fn char! Lexer.advance(&self)
 {
-	if (self.unread)
-	{
-		self.unread = false;
-		return self.current;
-	}
-	self.current = self.s.read_byte()!;
-	return self.current;
+	if (self.at_end()) return IoError.EOF?;
+	return self.s[self.current++];
 }
 
-fn void Lexer.unread_byte(&self)
+fn char Lexer.peek(&self)
 {
-	self.unread = true; 
+	if (self.at_end()) return '\0';
+	return self.s[self.current];
 }
 
-fn char! Lexer.peek(&self)
+fn char Lexer.peek_next(&self)
 {
-	if (self.unread)
-	{
-		return self.current;
-	}
-	char c = self.read_byte()!;
-	self.unread_byte();
-	return c;
+	if (self.current + 1 >= self.s.len) return '\0';
+	return self.s[self.current + 1];
 }
 
-fn void! Lexer.skip_ws(&self)
+fn bool Lexer.must(&self, char c)
 {
-	char c;
-	while ((c = self.peek()!) && (c == 0x20 || c == 0x09)) self.read_byte()!;
-}
-
-
-fn DString! Lexer.consume_until(&self, char until)
-{
-	DString s;
-	s.new_init(16, self.allocator);
-	char c;
-	bool escape;
-	do {
-		c = self.read_byte()!;
-		s.append_char(c);
-		if (c == '\\') 
-		{
-			escape = true;
-		}
-		else if (escape)
-		{
-			escape = false;
-		}
-	} while (c != until || escape);
-	return s;
-}
-
-macro bool is_ident(char c) {
-	return (c.is_digit() || c.is_alpha() || c == '-' || c == '_');
-}
-
-macro bool is_valid_hex(String s) {
-	foreach (c : s)
-	{
-		if (c.is_digit() || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f') || c == '_')
-		{
-			continue;
-		}
-		else
-		{
-			return false;
-		}
-	}
+	if (self.at_end() || self.peek() != c) return false;
+	self.current++;
 	return true;
 }
 
-macro bool is_valid_octal(String s) {
-	foreach (c : s)
-	{
-		if ((c >= '0' && c <= '7') || c == '_')
-		{
-			continue;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-macro bool is_valid_binary(String s) {
-	foreach (c : s)
-	{
-		if ((c >= '0' && c <= '1') || c == '_')
-		{
-			continue;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-macro bool is_valid_int(String s) {
-	foreach (c : s)
-	{
-		if ((c >= '0' && c <= '9') || c == '_')
-		{
-			continue;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-macro bool is_valid_float(String s) {
-	foreach (c : s)
-	{
-		if ((c >= '0' && c <= '9') || c == '_' || c == '.' || c == 'e')
-		{
-			continue;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
-fn void! Lexer.consume_ident(&self, DString *s)
+fn void Lexer.add_token(&self, TokenType type, Object *literal = null)
 {
-	char c;
-	while (is_ident(c = self.read_byte()!))
-	{
-		s.append_char(c);
-	}
-	self.unread_byte();
+	String text = self.s[self.start..self.current-1];
+	self.tokens.push(Token{
+		.type = type,
+		.lexeme = text.copy(self.allocator),
+		.literal = literal,
+		.line = self.line,
+	});
 }
 
-fn Token*! Lexer.next_token(&self)
+fn TokenList*! Lexer.scan_tokens(&self)
 {
-	char c;
-	while (1) 
+	while (!self.at_end())
 	{
-		c = self.read_byte()!;
-		switch (c) 
+		self.start = self.current;
+		self.scan_token()!;
+	}
+	self.add_token(TokenType.EOF);
+	return self.tokens;
+}
+
+fn void! Lexer.scan_token(&self)
+{
+	char c = self.advance()!;
+	switch (c) 
+	{
+		case 0x20: // space
+		case 0x09: // \t
+		case 0x0D: // \r
+			break;
+		case 0x0A:
+			self.line++;
+			self.scan_value = false;
+			self.add_token(TokenType.NEWLINE);
+		case '#':
+			while (self.peek() != 0x0A) self.advance()!;
+			self.add_token(TokenType.COMMENT);
+		case '.':
+			self.add_token(TokenType.PERIOD);
+		case '+':
+			self.add_token(TokenType.PLUS);
+		case '-':
+			self.add_token(TokenType.MINUS);
+		case '=':
+			self.scan_value = true;
+			self.add_token(TokenType.EQUAL);
+		case '{':
+			self.add_token(TokenType.LBRACE);
+		case '}':
+			self.add_token(TokenType.RBRACE);
+		case '[':
+			self.add_token(TokenType.LBRACKET);
+		case ']':
+			self.add_token(TokenType.RBRACKET);
+		case ',':
+			self.add_token(TokenType.COMMA);
+		/*
+		case '0':
+			if (self.must('x') || self.must('X'))
+			{
+				// TODO: read hex number
+			}
+			else if (self.must('o') || self.must('O'))
+			{
+				// TODO: read octal number
+			}
+			else if (self.must('b') || self.must('B'))
+			{
+				// TODO: read binary number
+			}
+		*/
+		case '"':
+			self.basic_string()!;
+		case '\'':
+			self.literal_string()!;
+		default:
+			if (self.scan_value && c.is_digit()) {
+				self.number_or_datetime()!;
+			}
+			else
+			{
+				self.unquoted_key()!;
+			}
+	}
+}
+
+fn void! Lexer.basic_string(&self)
+{
+	// we have already consumed '"'
+	while (!self.at_end() && self.peek() != '"') self.advance()!;
+	// FIXME: object literal?
+	self.add_token(TokenType.STRING);
+}
+
+fn void! Lexer.literal_string(&self)
+{
+	// we have already consumed '''
+	while (!self.at_end() && self.peek() != '\'') self.advance()!;
+	// FIXME: object literal?
+	self.add_token(TokenType.STRING);
+}
+
+fn void! Lexer.unquoted_key(&self)
+{
+	char p;
+	while LOOP: (!self.at_end())
+	{
+		p = self.peek();
+		if ((p >= 'a' && p <= 'z') || (p >= 'A' && p <= 'Z') || 
+			(p >= '0' && p <= '9') || p == '-' || p == '_' )
 		{
-			case 0x20: 
-			case 0x09: 
-				// skip whitespace
-				continue;
-			case 0x0D:
-				char peek = self.peek()!;
-				if (peek == 0x0A)
-				{
-					self.read_byte()!;
-					return self.token(TokenType.NEWLINE);
-				}
-				else
-				{
-					// TODO: what to do?
-				}
-			case 0x0A:
-				return self.token(TokenType.NEWLINE);
-			case '#':
-				self.consume_until(0x0A)!;
-			case '.':
-				return self.token(TokenType.DOT);
-			case '+':
-				return self.token(TokenType.PLUS);
-			case '-':
-				return self.token(TokenType.MINUS);
-			case '=':
-				return self.token(TokenType.EQUAL);
-			case '{':
-				return self.token(TokenType.LBRACE);
-			case '}':
-				return self.token(TokenType.RBRACE);
-			case '[':
-				return self.token(TokenType.LBRACKET);
-			case ']':
-				return self.token(TokenType.RBRACKET);
-			case ',':
-				return self.token(TokenType.COMMA);
-			case '0':
-				char peek = self.peek()!;
-				switch (peek) {
-					case 'X':
-					case 'x':
-						// TODO: consume hexdigit
-						return self.token(TokenType.NUMBER);
-					case 'O':
-					case 'o':
-						// TODO: consume octaldigit
-						return self.token(TokenType.NUMBER);
-					case 'B':
-					case 'b':
-						// TODO: consume binarydigit
-						return self.token(TokenType.NUMBER);
-				}
-			case '"':
-				// consume quoted string
-				DString s = self.consume_until('"')!;
-				return self.token_with_lexeme(TokenType.STRING, s.str_view());
-
-				// TODO: multi-line string (""")
-			case '\'':
-				// consume literal string
-				// TODO: multi-line string (''')
-			default:
-				if (is_ident(c)) 
-				{
-					DString s;
-					s.new_init(16, self.allocator);
-					s.append_char(c);
-					if (catch err = self.consume_ident(&s))
-					{
-						// if we encounter EOF, return
-						// content first and error out
-						// on the next call.
-						if (err != IoError.EOF) return err?;
-					}
-					String str = s.str_view();
-					switch (s)
-					{
-						case "true":
-							return self.token(TokenType.TRUE);
-						case "false":
-							return self.token(TokenType.FALSE);
-						case "nan":
-							return self.token(TokenType.NAN);
-						case "inf":
-							return self.token(TokenType.INF);
-					}
-					return self.token_with_lexeme(TokenType.STRING, str);
-				}
-				else
-				{
-					return IoError.UNKNOWN_ERROR?;
-				}
-
+			self.advance()!;
+		} else {
+			break LOOP;
 		}
 	}
+	String text = self.s[self.start..self.current-1];
+ 	Object *literal = object::new_string(text, self.allocator);
+	self.add_token(TokenType.STRING, literal);
 }
 
+fn void! Lexer.number_or_datetime(&self)
+{
+	unsupported("not implemented yet");
+}
 
