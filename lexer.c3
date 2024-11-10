@@ -6,24 +6,11 @@ fault Errors {
 	GENERL_ERROR,
 }
 
-/*
-fn Object*! parse_string(String s) {
-	return parse(ByteReader{}.init(s), allocator::heap());
-}
-
-fn Object*! temp_parse_string(String s) {
-	return parse(ByteReader{}.init(s), allocator::temp());
-}
-
-fn Object*! parse(InStream s, Allocator allocator = allocator::heap()) {
-	// TODO
-}
-*/
-
 // -- implementation follows --
 
 enum TokenType @local
 {
+	// single-char token
 	NEWLINE,
 	LBRACE,
 	RBRACE,
@@ -32,20 +19,16 @@ enum TokenType @local
 	COMMA,
 	PLUS,
 	MINUS,
-	EXPONENT,
 	DOT,
 	EQUAL,
-	IDENT,
-	QSTRING,
-	LSTRING,
-	UNDERSCORE,
+
+	// multiple-char tokens
+	NUMBER,
+	STRING,
 	TRUE,
 	FALSE,
-	HEX,
-	OCT,
-	BIN,
-	NAN,
 	INF,
+	NAN,
 }
 
 struct Token (Printable)
@@ -79,10 +62,7 @@ fn void Lexer.init(&self, InStream s, Allocator allocator)
 
 fn Token* Lexer.token(&self, TokenType type)
 {
-	Token* tok;
-	mem::@scoped(self.allocator) {
-		tok = mem::new(Token);
-	};
+	Token *tok = allocator::new(self.allocator, Token);
 	tok.type = type;
 	return tok;
 }
@@ -268,8 +248,6 @@ fn Token*! Lexer.next_token(&self)
 				self.consume_until(0x0A)!;
 			case '.':
 				return self.token(TokenType.DOT);
-			case '_':
-				return self.token(TokenType.UNDERSCORE);
 			case '+':
 				return self.token(TokenType.PLUS);
 			case '-':
@@ -286,28 +264,26 @@ fn Token*! Lexer.next_token(&self)
 				return self.token(TokenType.RBRACKET);
 			case ',':
 				return self.token(TokenType.COMMA);
-			case 'e':
-				return self.token(TokenType.EXPONENT);
 			case '0':
 				char peek = self.peek()!;
 				switch (peek) {
 					case 'X':
 					case 'x':
 						// TODO: consume hexdigit
-						return self.token(TokenType.HEX);
+						return self.token(TokenType.NUMBER);
 					case 'O':
 					case 'o':
 						// TODO: consume octaldigit
-						return self.token(TokenType.OCT);
+						return self.token(TokenType.NUMBER);
 					case 'B':
 					case 'b':
 						// TODO: consume binarydigit
-						return self.token(TokenType.BIN);
+						return self.token(TokenType.NUMBER);
 				}
 			case '"':
 				// consume quoted string
 				DString s = self.consume_until('"')!;
-				return self.token_with_lexeme(TokenType.QSTRING, s.str_view());
+				return self.token_with_lexeme(TokenType.STRING, s.str_view());
 
 				// TODO: multi-line string (""")
 			case '\'':
@@ -338,7 +314,7 @@ fn Token*! Lexer.next_token(&self)
 						case "inf":
 							return self.token(TokenType.INF);
 					}
-					return self.token_with_lexeme(TokenType.IDENT, str);
+					return self.token_with_lexeme(TokenType.STRING, str);
 				}
 				else
 				{

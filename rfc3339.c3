@@ -1,9 +1,8 @@
 module toml::rfc3339;
 
-import toml::rfc3339::parser;
+import toml::rfc3339::parser @public;
 
 import std::time::datetime;
-import std::io;
 
 // Parse date and time formats according to RFC 3339.
 // https://www.rfc-editor.org/rfc/rfc3339
@@ -30,6 +29,42 @@ import std::io;
 */
 
 // 1996-12-19T16:39:57-08:00
+
+fn DateTime! parse(String s)
+{
+	return Parser{s}.parse();
+}
+
+module toml::rfc3339_test @test;
+
+import toml::rfc3339;
+import std::io;
+import std::time;
+
+fn void! test_parse_date_time() @test
+{
+	String s = "1996-12-19T16:39:57-08:00";
+	DateTime dt = rfc3339::parse(s)!;
+	io::printfn("\n%s",s);
+	io::printfn("year: %4d, mon: %2d, day: %2d", dt.year, dt.month+1, dt.day);
+	io::printfn("hour: %4d, min: %2d, sec: %2d", dt.hour, dt.min, dt.sec);
+}
+
+fn void! test_parse_utc() @test
+{
+	String s = "1996-12-19T16:39:57Z";
+	DateTime dt = rfc3339::parse(s)!;
+}
+
+fn void! test_parse_utc_frac() @test
+{
+	String s = "1996-12-19T16:39:57.123456Z";
+	DateTime dt = rfc3339::parse(s)!;
+}
+
+module toml::rfc3339::parser @private;
+
+import std::time::datetime;
 
 fault Error
 {
@@ -117,60 +152,6 @@ fn int Offset.to_sec(&o)
 	return o.hour * 3600 + o.min * 60;
 }
 
-fn DateTime! parse(String s)
-{
-	Parser p = {s};
-
-	Date d;
-	d.parse(&p)!;
-
-	if (p.peek() == ' ' || p.peek() == 'T') p.consume(p.peek())!;
-
-	Time t;
-	t.parse(&p)!;
-
-	DateTime dt = datetime::from_date(
-		d.year, (Month)(d.month-1), d.day, 
-		t.hour, t.min, t.sec, t.us);
-
-	Offset off;
-	if (try off.parse(&p))
-	{
-		TzDateTime tzdt = dt.to_gmt_offset(off.to_sec());
-		dt = tzdt.date_time;
-	}
-
-	return dt;
-}
-
-module toml::rfc3339_test @test;
-
-import toml::rfc3339;
-import std::io;
-import std::time;
-
-fn void! test_parse_date_time() @test
-{
-	String s = "1996-12-19T16:39:57-08:00";
-	DateTime dt = rfc3339::parse(s)!;
-	io::printfn("\n%s",s);
-	io::printfn("year: %4d, mon: %2d, day: %2d", dt.year, dt.month+1, dt.day);
-	io::printfn("hour: %4d, min: %2d, sec: %2d", dt.hour, dt.min, dt.sec);
-}
-
-fn void! test_parse_utc() @test
-{
-	String s = "1996-12-19T16:39:57Z";
-	DateTime dt = rfc3339::parse(s)!;
-}
-
-fn void! test_parse_utc_frac() @test
-{
-	String s = "1996-12-19T16:39:57.123456Z";
-	DateTime dt = rfc3339::parse(s)!;
-}
-
-module toml::rfc3339::parser;
 
 fault ParserError
 {
@@ -181,6 +162,30 @@ fault ParserError
 struct Parser
 {
 	String s;
+}
+
+fn DateTime! Parser.parse(&p)
+{
+	Date d;
+	d.parse(p)!;
+
+	if (p.peek() == ' ' || p.peek() == 'T') p.consume(p.peek())!;
+
+	Time t;
+	t.parse(p)!;
+
+	DateTime dt = datetime::from_date(
+		d.year, (Month)(d.month-1), d.day, 
+		t.hour, t.min, t.sec, t.us);
+
+	Offset off;
+	if (try off.parse(p))
+	{
+		TzDateTime tzdt = dt.to_gmt_offset(off.to_sec());
+		dt = tzdt.date_time;
+	}
+
+	return dt;
 }
 
 fn bool Parser.empty(&p)
