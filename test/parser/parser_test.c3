@@ -71,6 +71,20 @@ fn void! parser_read_quoted_str() @test
 	assert(p.buf.str_view() == want, "got: %s, but want: %s", p.buf.str_view(), want);
 }
 
+fn void! parser_read_multiline_str() @test
+{
+	toml::parser::Parser p;
+	p.init( `"""multi
+		line with two quotes """""`,
+		allocator::temp(),
+	).read_quoted_string()!;
+	defer p.free();
+
+	String want = "multi\n\t\tline with two quotes \"\"";
+	assert(p.buf.str_view() == want, "got: %s, but want: %s", p.buf.str_view(), want);
+}
+
+
 fn void! parser_array_tables() @test
 {
 	DString s;

@@ -44,8 +44,7 @@ fn void Parser.unread_byte(&self)
 	self.current--;
 }
 
-// FIXME: no optional necessary?
-fn char! Parser.peek(&self)
+fn char Parser.peek(&self)
 {
 	if (self.at_end()) return '\0';
 	return self.s[self.current];
@@ -69,7 +68,7 @@ fn bool is_newline(char c)
 fn void! Parser.skip_ws(&self)
 {
 	char c;
-	while ((c = self.peek()!) && is_ws(c)) self.read_byte()!;
+	while ((c = self.peek()) && is_ws(c)) self.read_byte()!;
 }
 
 fn void! Parser.skip_line(&self)
@@ -83,7 +82,7 @@ fn void! Parser.skip_line(&self)
 
 fn void! Parser.skip_ws_comment_newline(&self)
 {
-	char c = self.peek()!;
+	char c = self.peek();
 	switch
 	{
 		case is_ws(c):
@@ -116,7 +115,16 @@ fn void! Parser.read_until_char(&self, char stop)
 fn void! Parser.read_quoted_string(&self)
 {
 	char quote = self.read_byte()!;
+	while (self.must(quote));
 	self.read_until_char(quote)!;
+	while (self.must(quote));
+}
+
+fn bool Parser.must(&self, char c)
+{
+	if (self.peek() != c) return false;
+	self.current++;
+	return true;
 }
 
 fn bool! Parser.match(&self, String str)
@@ -137,7 +145,7 @@ fn Object*! Parser.parse_value(&self)
 
 	self.buf.clear();
 
-	char c = self.peek()!;
+	char c = self.peek();
 	switch (c)
 	{
 		case '"':
@@ -186,7 +194,7 @@ fn Object*! Parser.parse_value(&self)
 
 				if (catch self.skip_ws_comment_newline()) break LOOP;
 
-				switch (self.peek()!)
+				switch (self.peek())
 				{
 					case ',':
 						self.read_byte()!;
@@ -214,7 +222,7 @@ fn Object*! Parser.parse_value(&self)
 
 				if (catch self.skip_ws()) break LOOP;
 
-				switch (self.peek()!)
+				switch (self.peek())
 				{
 					case ',':
 						self.read_byte()!;
@@ -231,7 +239,7 @@ fn Object*! Parser.parse_value(&self)
 			String str;
 			while LOOP: (1)
 			{
-				c = self.peek()!;
+				c = self.peek();
 
 				str = self.buf.str_view();
 				if (is_ws(c) && !str.contains(":") && !str.contains("-")) break LOOP;
@@ -354,8 +362,8 @@ fn void! Parser.parse_keyval(&self, Object *obj)
 
 	// consume ws '=' ws
 	self.skip_ws()!;
-	if (self.peek()! != '=') {
-		io::printfn("line %d: expected '=' but got '%c'", self.line, self.peek()!);
+	if (self.peek() != '=') {
+		io::printfn("line %d: expected '=' but got '%c'", self.line, self.peek());
 		return IoError.GENERAL_ERROR?;
 	}
 	self.read_byte()!;
@@ -395,18 +403,12 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 	char c;
 	c = self.read_byte()!;
 	if (c != '[') {
-		io::printfn("line %d: expected '[' but got %c", self.line, self.peek()!);
+		io::printfn("line %d: expected '[' but got %c", self.line, self.peek());
 		return IoError.GENERAL_ERROR?;
 	}
 
-	if (try p = self.peek())
-	{
-		is_array = p == '[';
-		if (is_array)
-		{
-			self.read_byte()!;
-		}
-	}
+	is_array = self.peek() == '[';
+	if (is_array) self.read_byte()!;
 
 	StringList key = self.parse_key()!;
 	defer { key.free(); }
@@ -415,7 +417,7 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 	self.skip_ws()!;
 	c = self.read_byte()!;
 	if (c != ']') {
-		io::printfn("expected ']' but got %c", self.peek()!);
+		io::printfn("expected ']' but got %c", self.peek());
 		return IoError.GENERAL_ERROR?;
 	}
 
@@ -423,7 +425,7 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 	{
 		c = self.read_byte()!;
 		if (c != ']') {
-			io::printfn("expected ']' but got %c", self.peek()!);
+			io::printfn("expected ']' but got %c", self.peek());
 			return IoError.GENERAL_ERROR?;
 		}
 	}
@@ -437,7 +439,7 @@ fn void! Parser.expr(&self, Object *obj)
 
 	self.skip_ws()!;
 
-	c = self.peek()!;
+	c = self.peek();
 	switch (c) {
 		case '#':
 			self.skip_line()!;
@@ -451,7 +453,7 @@ fn void! Parser.expr(&self, Object *obj)
 
 	self.skip_ws()!;
 
-	c = self.peek()!;
+	c = self.peek();
 	switch (c)
 	{
 		case '#':
