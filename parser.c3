@@ -298,6 +298,10 @@ fn Object*! Parser.parse_value(&self)
 	}
 }
 
+fn bool is_unquoted_key(char c)
+{
+       return (c.is_alpha() || c.is_digit() || c == '-' || c == '_');
+}
 
 // key = simple-key / dotted-key
 // simple-key = quoted-key / unquoted-key
@@ -305,64 +309,41 @@ fn Object*! Parser.parse_value(&self)
 // unquoted-key = 1*( ALPHA / DIGIT / 0x2d / 0x5F); A-Z / a-z / 0-9 / - / _
 // quoted-key = basic-string / literal-string
 // dotted-key = simple-key 1*( dot-sep simple-key )
-fn StringList! Parser.parse_key(&self)
+fn void! Parser.key(&self, StringList *list)
 {
-	StringList list;
-	list.new_init(6, self.allocator);
-
-	DString s;
-	s.new_init(16, self.allocator);
-	defer { s.free(); }
-
+	int start, end;
 	char c;
-	while LOOP: (1)
+	while (1)
 	{
-		c = self.read_byte()!;
+		start = self.current;
 
-		if (c == '=' || c == ']' || c == '\n' || c == '#') {
-			self.unread_byte();
-			String key = s.copy_str(self.allocator);
-			if (key.len > 0)
-			{
-				list.push(key);
-			}
-			else
-			{
-				// io::printfn("line %d: empty line", self.line);
-			}
-			s.clear();
-			break LOOP;
-		}
+		self.skip_ws()!;
+		c = self.peek();
 
 		if (c == '"' || c == '\'') {
-			self.read_byte()!;
-			self.read_until_char(c)!;
-			continue;
-		}
-
-		if (is_ws(c)) {
-			self.skip_ws()!;
-			continue;
-		}
-
-		 if (c == '.') {
-			String key = s.copy_str(self.allocator);
-			if (key.len > 0)
-			{
-				list.push(key);
-			}
-			else
-			{
-				// io::printfn("line %d: empty key", self.line);
-			}
-			s.clear();
-			self.skip_ws()!;
+			// quoted key
+			char quote = self.advance()!;
+			while (self.peek() != quote) self.advance()!;
+			self.must(quote);
+			start = start + 1;
+			end = self.current - 2;
 		} else {
-			s.append_char(c);
+			// unquoted key
+			while (is_unquoted_key(self.peek())) self.advance()!;
+			end = self.current-1;
 		}
-	}
 
-	return list;
+		if (end <= start) {
+			io::printn("no keys found?");
+			return;
+		}
+
+		io::printfn("adding to list: %s", self.s[start..end]);
+		list.push(self.s[start..end]);
+
+		self.skip_ws()!;
+		if (!self.must('.')) return;
+	}
 }
 
 fn void! Parser.add_keyval(&self, Object *obj, StringList k, Object* v)
@@ -384,8 +365,11 @@ fn void! Parser.keyval(&self, Object *obj)
 	// parse key
 
 	// key is a list of table
-	StringList key = self.parse_key()!;
+	StringList key;
+	key.new_init(4, self.allocator);
 	defer { key.free(); }
+
+	self.key(&key)!;
 
 	if (key.len() == 0) {
 		// io::printn("empty keys..");
@@ -443,8 +427,12 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 	is_array = self.peek() == '[';
 	if (is_array) self.read_byte()!;
 
-	StringList key = self.parse_key()!;
-	defer { key.free(); }
+	StringList key;
+	key.new_init(4, self.allocator);
+	defer key.free();
+
+	self.key(&key)!;
+
 	Object *cur = self.create_table(key, obj, is_array)!;
 
 	self.skip_ws()!;
@@ -508,6 +496,7 @@ fn Object*! Parser.toml(&self)
 		else
 		{
 			io::printn("parser: expected newline");
+			if (self.at_end()) break LOOP;
 		}
 	}
 	return obj;
