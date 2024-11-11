@@ -28,8 +28,8 @@ enum TokenType @local
 
 	// literals
 	COMMENT,
-	STRING, // [ml-]basic-string, [ml-]literal-string 
-	INTEGER, // dec, hx, oct, bin
+	STRING, // [ml-]basic-string, [ml-]literal-string, unquote-key
+	INTEGER, // dec, hex, oct, bin
 	FLOAT, // infinity, nan
 	BOOLEAN, // true, false
 	DATETIME,
@@ -147,10 +147,6 @@ fn void! Lexer.scan_token(&self)
 			self.add_token(TokenType.COMMENT);
 		case '.':
 			self.add_token(TokenType.PERIOD);
-		case '+':
-			self.add_token(TokenType.PLUS);
-		case '-':
-			self.add_token(TokenType.MINUS);
 		case '=':
 			self.scan_value = true;
 			self.add_token(TokenType.EQUAL);
@@ -164,27 +160,12 @@ fn void! Lexer.scan_token(&self)
 			self.add_token(TokenType.RBRACKET);
 		case ',':
 			self.add_token(TokenType.COMMA);
-		/*
-		case '0':
-			if (self.must('x') || self.must('X'))
-			{
-				// TODO: read hex number
-			}
-			else if (self.must('o') || self.must('O'))
-			{
-				// TODO: read octal number
-			}
-			else if (self.must('b') || self.must('B'))
-			{
-				// TODO: read binary number
-			}
-		*/
 		case '"':
 			self.basic_string()!;
 		case '\'':
 			self.literal_string()!;
 		default:
-			if (self.scan_value && c.is_digit()) {
+			if (self.scan_value && (c.is_digit() || c == '+' || c == '-')) {
 				self.number_or_datetime()!;
 			}
 			else
