@@ -110,10 +110,35 @@ fn void! Parser.read_until_char(&self, char stop)
 
 fn void! Parser.read_quoted_string(&self)
 {
-	char quote = self.read_byte()!;
-	while (self.must(quote));
-	self.read_until_char(quote)!;
-	while (self.must(quote));
+	self.start = self.current;
+	char quote = self.read_byte()!; // first quote
+	if (self.must(quote)) { // second quote
+		// return empty quoted string ("")
+		if (!self.must(quote)) return;
+
+		// handle multi-quote string (""")
+		self.read_until_char(quote)!;
+
+		// cannot have more than 5 terminal quotes
+		int i = 0;
+		while (!self.at_end() && self.must(quote)) i++;
+		if (i > 5) io::printn("parser error: too many terminal quotes");
+
+		// must have at least 6 chars (""""""") in smallest ml string
+		if (self.current - 6 <= self.start)
+		{
+			io::printn("parser error: not enough chars in multiline string");
+			return;
+		}
+
+		self.buf.clear();
+		self.buf.append_chars(self.s[self.start+3..self.current-3-1]);
+	}
+	else 
+	{
+		// handle single-quoted string "abc"
+		self.read_until_char(quote)!;
+	}
 }
 
 fn bool Parser.must(&self, char c)
