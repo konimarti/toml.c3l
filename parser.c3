@@ -239,7 +239,7 @@ fn Object*! Parser.parse_value(&self)
 			{
 				if (catch self.skip_ws()) break LOOP;
 
-				self.parse_keyval(table)!;
+				self.keyval(table)!;
 
 				if (catch self.skip_ws()) break LOOP;
 
@@ -299,6 +299,12 @@ fn Object*! Parser.parse_value(&self)
 }
 
 
+// key = simple-key / dotted-key
+// simple-key = quoted-key / unquoted-key
+//
+// unquoted-key = 1*( ALPHA / DIGIT / 0x2d / 0x5F); A-Z / a-z / 0-9 / - / _
+// quoted-key = basic-string / literal-string
+// dotted-key = simple-key 1*( dot-sep simple-key )
 fn StringList! Parser.parse_key(&self)
 {
 	StringList list;
@@ -371,11 +377,16 @@ fn void! Parser.add_keyval(&self, Object *obj, StringList k, Object* v)
 	cur.set(key, v);
 }
 
-fn void! Parser.parse_keyval(&self, Object *obj)
+// keyval = key keyval-sep val
+// keyval-sep = ws %0x3D ws ; =
+fn void! Parser.keyval(&self, Object *obj)
 {
+	// parse key
+
 	// key is a list of table
 	StringList key = self.parse_key()!;
 	defer { key.free(); }
+
 	if (key.len() == 0) {
 		// io::printn("empty keys..");
 		return;
@@ -383,13 +394,14 @@ fn void! Parser.parse_keyval(&self, Object *obj)
 
 	// consume ws '=' ws
 	self.skip_ws()!;
-	if (self.peek() != '=') {
+	if (!self.must('='))
+	{
 		io::printfn("line %d: expected '=' but got '%c'", self.line, self.peek());
 		return IoError.GENERAL_ERROR?;
 	}
-	self.read_byte()!;
 	self.skip_ws()!;
 
+	// parse value
 	Object* val = self.parse_value()!;
 
 	self.add_keyval(obj, key, val)!;
@@ -454,9 +466,9 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 	return cur;
 }
 
-// expression = ws [ comment ]
-// expression = ws keyval ws [ comment ]
-// expression = ws table ws [ comment ]
+// expression =  ws [ comment ]
+// expression =/ ws keyval ws [ comment ]
+// expression =/ ws table ws [ comment ]
 fn void! Parser.expression(&self, Object *obj)
 {
 	self.skip_ws()!;
@@ -468,13 +480,16 @@ fn void! Parser.expression(&self, Object *obj)
 	}
 	else
 	{
-		self.parse_keyval(self.table)!;
+		self.keyval(self.table)!;
 	}
 
 	self.skip_ws()!;
 	self.skip_comment()!;
 }
 
+// toml = expression *( newline expression )
+// newline =  0x0A
+// newline =/ 0x0D.0x0A
 fn Object*! Parser.toml(&self)
 {
 	Object* obj = object::new_obj(self.allocator);
