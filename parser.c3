@@ -33,6 +33,8 @@ fn void Parser.free(&self)
 
 }
 
+fn char! Parser.advance(&self) => self.read_byte();
+
 fn char! Parser.read_byte(&self)
 {
 	if (self.at_end()) return IoError.EOF?;
@@ -55,29 +57,23 @@ fn bool Parser.at_end(&self)
 	return self.current >= self.s.len;
 }
 
-fn bool is_ws(char c)
-{
-	return (c == 0x20 || c == 0x09);
-}
-
-fn bool is_newline(char c)
-{
-	return (c == 0x0A || c == 0x0D);
-}
+fn bool is_ws(char c) => (c == 0x20 || c == 0x09);
+fn bool is_newline(char c) => (c == 0x0A || c == 0x0D);
 
 fn void! Parser.skip_ws(&self)
 {
-	char c;
-	while ((c = self.peek()) && is_ws(c)) self.read_byte()!;
+	while (is_ws(self.peek())) self.advance()!;
 }
 
-fn void! Parser.skip_line(&self)
+// comment = comment-start-symbol *non-eol
+// comment-start-symboel = #
+// non-eol =  0x09 / 0x20 - 0x7f / non-ascii
+// non-ascii = 0x80 - D7FF/ 0xE000 - 10FFFF
+// TODO: correct non-eol / non-ascii parsing
+fn void! Parser.skip_comment(&self)
 {
-	char c;
-	do {
-		c = self.read_byte()!;
-	}
-	while (c != 0x0A);
+	if (!self.must('#')) return;
+	while (!is_newline(self.peek())) self.advance()!;
 }
 
 fn void! Parser.skip_ws_comment_newline(&self)
@@ -90,7 +86,7 @@ fn void! Parser.skip_ws_comment_newline(&self)
 			self.read_byte()!;
 			return self.skip_ws_comment_newline();
 		case c == '#':
-			self.skip_line()!;
+			self.skip_comment()!;
 	}
 }
 
@@ -433,40 +429,25 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 	return cur;
 }
 
-fn void! Parser.expr(&self, Object *obj)
+// expression = ws [ comment ]
+// expression = ws keyval ws [ comment ]
+// expression = ws table ws [ comment ]
+fn void! Parser.expression(&self, Object *obj)
 {
-	char c;
-
 	self.skip_ws()!;
+	self.skip_comment()!;
 
-	c = self.peek();
-	switch (c) {
-		case '#':
-			self.skip_line()!;
-			self.line++;
-			return;
-		case '[':
-			self.table = self.parse_table(obj)!;
-		default:
-			self.parse_keyval(self.table)!;
-	}
-
-	self.skip_ws()!;
-
-	c = self.peek();
-	switch (c)
+	if (self.peek() == '[')
 	{
-		case '#':
-			self.skip_line()!;
-			self.line++;
-		case 0x0D:
-			self.read_byte()!;
-			self.read_byte()!;
-			self.line++;
-		case 0x0A:
-			self.read_byte()!;
-			self.line++;
+		self.table = self.parse_table(obj)!;
 	}
+	else
+	{
+		self.parse_keyval(self.table)!;
+	}
+
+	self.skip_ws()!;
+	self.skip_comment()!;
 }
 
 fn Object*! Parser.toml(&self)
@@ -474,10 +455,19 @@ fn Object*! Parser.toml(&self)
 	Object* obj = object::new_obj(self.allocator);
 	self.table = obj;
 	while LOOP: (1) {
-		if (catch err = self.expr(obj))
+		if (catch err = self.expression(obj))
 		{
 			if (err == IoError.EOF) break LOOP;
 			return err?;
+		}
+		self.must('\r');
+		if (self.must('\n'))
+		{
+			self.line++;
+		}
+		else
+		{
+			io::printn("parser: expected newline");
 		}
 	}
 	return obj;
