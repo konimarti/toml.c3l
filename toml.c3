@@ -1,10 +1,9 @@
 module toml;
 
-import std::io;
 import std::collections::object;
 
-fn Object*! read_config(InStream in, Allocator allocator = allocator::heap())
+fn Object*! read_config(String s, Allocator allocator = allocator::heap())
 {
-	return toml::parser::Parser{}.init(in, allocator).toml();
+	return toml::parser::Parser{}.init(s, allocator).toml();
 }
 

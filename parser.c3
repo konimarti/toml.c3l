@@ -10,45 +10,50 @@ def StringList = List(<String>);
 
 struct Parser
 {
-	InStream s;
+	String s;
 	Allocator allocator;
-	bool unread;
-	char current;
+	int start;
+	int current;
 	int line;
+	DString buf;
 	Object* table;
 }
 
-fn Parser* Parser.init(&self, InStream s, Allocator allocator)
+fn Parser* Parser.init(&self, String s, Allocator allocator)
 {
-	*self = {s, allocator, false, '\0', 1, null};
+	*self = {.s = s, .allocator = allocator, .start = 0, .current = 0, 
+		.line = 1, .buf = DString{}, .table = null};
+	self.buf.new_init(16, allocator);
 	return self;
+}
+
+fn void Parser.free(&self)
+{
+	self.buf.free();
+
 }
 
 fn char! Parser.read_byte(&self)
 {
-	if (self.unread)
-	{
-		self.unread = false;
-		return self.current;
-	}
-	self.current = self.s.read_byte()!;
-	return self.current;
+	if (self.at_end()) return IoError.EOF?;
+	return self.s[self.current++];
 }
 
 fn void Parser.unread_byte(&self)
 {
-	self.unread = true; 
+	self.current--;
 }
 
+// FIXME: no optional necessary?
 fn char! Parser.peek(&self)
 {
-	if (self.unread)
-	{
-		return self.current;
-	}
-	char c = self.read_byte()!;
-	self.unread_byte();
-	return c;
+	if (self.at_end()) return '\0';
+	return self.s[self.current];
+}
+
+fn bool Parser.at_end(&self)
+{
+	return self.current >= self.s.len;
 }
 
 fn bool is_ws(char c)
@@ -91,7 +96,7 @@ fn void! Parser.skip_ws_comment_newline(&self)
 }
 
 
-fn void! Parser.read_until_char(&self, char stop, DString *s)
+fn void! Parser.read_until_char(&self, char stop)
 {
 	char c;
 	while LOOP: (1)
@@ -104,14 +109,14 @@ fn void! Parser.read_until_char(&self, char stop, DString *s)
 			case stop: 
 				break LOOP;
 		}
-		s.append_char(c);
+		self.buf.append_char(c);
 	}
 }
 
-fn void! Parser.read_quoted_string(&self, DString *s)
+fn void! Parser.read_quoted_string(&self)
 {
 	char quote = self.read_byte()!;
-	self.read_until_char(quote, s)!;
+	self.read_until_char(quote)!;
 }
 
 fn bool! Parser.match(&self, String str)
@@ -130,16 +135,15 @@ fn Object*! Parser.parse_value(&self)
 {
 	self.skip_ws()!;
 
-	DString s;
-	defer { s.free(); }
+	self.buf.clear();
 
 	char c = self.peek()!;
 	switch (c)
 	{
 		case '"':
 		case '\'':
-			self.read_quoted_string(&s)!;
-			return object::new_string(s.str_view(), self.allocator);
+			self.read_quoted_string()!;
+			return object::new_string(self.buf.str_view(), self.allocator);
 		case 't':
 			if (self.match("true")!)
 			{
@@ -224,11 +228,12 @@ fn Object*! Parser.parse_value(&self)
 
 			return table;
 		default:
+			String str;
 			while LOOP: (1)
 			{
 				c = self.peek()!;
 
-				String str = s.str_view();
+				str = self.buf.str_view();
 				if (is_ws(c) && !str.contains(":") && !str.contains("-")) break LOOP;
 				if (is_newline(c)) break LOOP;
 
@@ -241,9 +246,9 @@ fn Object*! Parser.parse_value(&self)
 				}
 
 				self.read_byte()!;
-				s.append_char(c);
+				self.buf.append_char(c);
 			}
-			String str = s.str_view();
+			str = self.buf.str_view();
 
 			// io::printfn("converting string '%s'", str);
 
@@ -296,7 +301,7 @@ fn StringList! Parser.parse_key(&self)
 
 		if (c == '"' || c == '\'') {
 			self.read_byte()!;
-			self.read_until_char(c, &s)!;
+			self.read_until_char(c)!;
 			continue;
 		}
 

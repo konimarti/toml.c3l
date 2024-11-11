@@ -7,13 +7,13 @@ import std::collections::object;
 fn void! test_parser() @test
 {
 	toml::parser::Parser scan;	
-	scan.init(ByteReader{}.init(`shipping.cost={boat=100.0, ml="""\nhello\nworld""""", cabin=0xdead, sell=true}
+	scan.init(`shipping.cost={boat=100.0, ml="""\nhello\nworld""""", cabin=0xdead, sell=true}
 	[basket]
 	fruit.apply.color = [1.2, 'literal', "quotedstring",true, [1 #shesd
 	,2
 	# comment
 	,3,]] 
-	`),
+	`,
 	allocator::temp());
 
 	io::printn("parser:");
@@ -25,7 +25,7 @@ fn void! test_parser() @test
 fn void! test_parser_toml_doc() @test
 {
 	toml::parser::Parser scan;	
-	scan.init(ByteReader{}.init(`
+	scan.init(`
 	# This is a TOML document
 
 	title = "TOML Example"
@@ -49,7 +49,7 @@ fn void! test_parser_toml_doc() @test
 	[servers.beta]
 	ip = "10.0.0.2"
 	role = "backend"
-	`),
+	`,
 	allocator::temp());
 
 	io::printn("parser:");
@@ -60,16 +60,15 @@ fn void! test_parser_toml_doc() @test
 
 fn void! parser_read_quoted_str() @test
 {
-	DString s;
-	s.new_init();
-	toml::parser::Parser{}.init(
-		ByteReader{}.init(`"quoted\"string"rest`),
+	toml::parser::Parser p;
+	p.init(
+		`"quoted\"string"rest`,
 		allocator::temp(),
-	).read_quoted_string(&s)!;
+	).read_quoted_string()!;
+	defer p.free();
 
 	String want = "quoted\"string";
-	assert(s.str_view() == want, "got: %s, but want: %s", s.str_view(), want);
-	s.free();
+	assert(p.buf.str_view() == want, "got: %s, but want: %s", p.buf.str_view(), want);
 }
 
 fn void! parser_array_tables() @test
@@ -78,7 +77,7 @@ fn void! parser_array_tables() @test
 	s.new_init();
 	toml::parser::Parser p;
 	p.init(
-		ByteReader{}.init(`
+		`
 		[[product]]
 		widget.color = "green"
 		widget.price = 3.14
@@ -86,7 +85,7 @@ fn void! parser_array_tables() @test
 		[[product]]
 		widget.color = "blue"
 		widget.price = 2.71
-		`),
+		`,
 		allocator::temp(),
 	);
 
