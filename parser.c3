@@ -161,6 +161,7 @@ fn Object*! Parser.value(&self)
 		case 't':
 		case 'f':
 			return self.boolean()!;
+		/* FIXME MOVE i and n to float()
 		case 'i':
 			if (self.match("inf")!)
 			{
@@ -175,6 +176,7 @@ fn Object*! Parser.value(&self)
 			}
 			io::printfn("line %d: expected value 'inf' but did not match", self.line);
 			return object::new_null();
+		*/
 		case '[':
 			return self.array();
 		case '{':
@@ -204,6 +206,8 @@ fn Object*! Parser.value(&self)
 
 			return table;
 		default:
+			return self.number_or_datetime();
+		/*
 			String str;
 			while LOOP: (1)
 			{
@@ -242,6 +246,7 @@ fn Object*! Parser.value(&self)
 			if (try f) return object::new_float(f, self.allocator);
 
 			return object::new_string(str, self.allocator);
+		*/
 	}
 }
 
