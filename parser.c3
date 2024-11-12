@@ -346,7 +346,7 @@ fn void! Parser.key(&self, StringList *list)
 	}
 }
 
-fn void! Parser.add_keyval(&self, Object *obj, StringList k, Object* v)
+fn void! Parser.insert(&self, Object *obj, StringList k, Object* v)
 {
 	if (k.len() == 0)
 	{
@@ -388,7 +388,7 @@ fn void! Parser.keyval(&self, Object *obj)
 	// parse value
 	Object* val = self.parse_value()!;
 
-	self.add_keyval(obj, key, val)!;
+	self.insert(obj, key, val)!;
 }
 
 fn Object*! Parser.create_table(&self, StringList tables, Object *cur, bool array = false)
