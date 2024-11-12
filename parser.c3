@@ -55,35 +55,48 @@ fn bool Parser.at_end(&self)
 
 fn bool is_ws(char c) => (c == 0x20 || c == 0x09);
 fn bool is_newline(char c) => (c == 0x0A || c == 0x0D);
+fn bool non_ascii(char c) => (c >= 0x80);
+fn bool non_eol(char c)
+{
+	return (c == 0x09 || (c >= 0x20 && c <= 0x7F) || non_ascii(c));
+}
 
 fn void! Parser.skip_ws(&self)
 {
 	while (is_ws(self.peek())) self.advance()!;
+	self.start = self.current;
 }
 
 // comment = comment-start-symbol *non-eol
 // comment-start-symboel = #
 // non-eol =  0x09 / 0x20 - 0x7f / non-ascii
 // non-ascii = 0x80 - D7FF/ 0xE000 - 10FFFF
-// TODO: correct non-eol / non-ascii parsing
 fn void! Parser.skip_comment(&self)
 {
 	if (!self.must('#')) return;
-	while (!is_newline(self.peek())) self.advance()!;
+	while (non_eol(self.peek())) self.advance()!;
+	self.start = self.current;
 }
 
+// sw-comment-newline = *( wschar / [comment ] newline )
 fn void! Parser.skip_ws_comment_newline(&self)
 {
-	char c = self.peek();
-	switch
+	while LOOP: (1)
 	{
-		case is_ws(c):
-		case is_newline(c):
-			self.read_byte()!;
-			return self.skip_ws_comment_newline();
-		case c == '#':
-			self.skip_comment()!;
+		char c = self.peek();
+		switch
+		{
+			case is_ws(c):
+				self.skip_ws()!;
+			case c == '#':
+				self.skip_comment()!;
+			case is_newline(c):
+				self.advance()!;
+			default:
+				break LOOP;
+		}
 	}
+	self.start = self.current;
 }
 
 fn String! Parser.text(&self)
