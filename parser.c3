@@ -113,14 +113,35 @@ fn bool Parser.must(&self, char c)
 
 fn bool! Parser.match(&self, String str)
 {
-	char c;
+	int backup = self.current;
 	foreach (s : str)
 	{
-		c = self.read_byte()!;
-		if (c != s) return false;
+		if (!self.must(s)) {
+			self.current = backup;
+			return false;
+		}
 		
 	}
 	return true;
+}
+
+fn Object*! Parser.boolean(&self)
+{
+	bool value;
+	if (self.match("true")!)
+	{
+		value = true;
+	}
+	else if (self.match("false")!)
+	{
+		value = false;
+	}
+	else
+	{
+		io::printfn("line %d: could not parse boolean", self.line);
+		return object::new_null();
+	}
+	return object::new_bool(value);
 }
 
 fn Object*! Parser.value(&self)
@@ -131,23 +152,10 @@ fn Object*! Parser.value(&self)
 	{
 		case '"':
 		case '\'':
-			//FIXME: delete
-			//return object::new_string(self.string()!, self.allocator);
 			return self.string()!;
 		case 't':
-			if (self.match("true")!)
-			{
-				return object::new_bool(true);
-			}
-			io::printfn("line %d: expected value 'true' but did not match", self.line);
-			return object::new_null();
 		case 'f':
-			if (self.match("false")!)
-			{
-				return object::new_bool(false);
-			}
-			io::printfn("line %d: expected value 'false' but did not match", self.line);
-			return object::new_null();
+			return self.boolean()!;
 		case 'i':
 			if (self.match("inf")!)
 			{
