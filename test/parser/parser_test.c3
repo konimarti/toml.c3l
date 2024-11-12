@@ -58,30 +58,61 @@ fn void! test_parser_toml_doc() @test
 	io::printn(obj);
 }
 
-fn void! parser_read_quoted_str() @test
+struct StringTestCase
 {
-	toml::parser::Parser p;
-	p.init(
-		`"quoted\"string"rest`,
-		allocator::temp(),
-	).read_quoted_string()!;
-	defer p.free();
+	String name;
+	String input;
+	String want;
+}
 
-	String want = "quoted\"string";
-	assert(p.buf.str_view() == want, "got: %s, but want: %s", p.buf.str_view(), want);
+fn void! parser_value_string() @test
+{
+	StringTestCase[] tests = {
+		{
+			.name = "quoted string",
+			.input = `"quoted\"string"rest`,
+			.want = "quoted\\\"string",
+		},
+		{
+			.name = "multiline basic string with mlb-quotes",
+			.input = `"""string""hello"world"""""`,
+			.want = "string\"\"hello\"world\"\"",
+		},
+		{
+			.name = "multiline basic string with newlines",
+			.input = "\"\"\"hello\\nworld\"\"\"",
+			.want = "hello\\nworld",
+		},
+		/*
+		{
+			.name = "multiline basic string with escaped newlines",
+			.input = "\"\"\"hello \\ \\nworld\"\"\"",
+			.want = "hello\\nworld",
+		},
+		*/
+	};
+
+	foreach (i, t : tests)
+	{
+		toml::parser::Parser p;
+		String s = p.init(t.input, allocator::temp()).string()!.s;
+		assert(s == t.want,
+			"test %d [%s]: got: %s, but want: %s", i+1, t.name, s, t.want);
+		p.free();
+	}
 }
 
 fn void! parser_read_multiline_str() @test
 {
 	toml::parser::Parser p;
-	p.init( `"""multi
+	String s = p.init( `"""multi
 		line with two quotes """""`,
 		allocator::temp(),
-	).read_quoted_string()!;
+	).string()!.s;
 	defer p.free();
 
 	String want = "multi\n\t\tline with two quotes \"\"";
-	assert(p.buf.str_view() == want, "got: %s, but want: %s", p.buf.str_view(), want);
+	assert(s == want, "got: %s, but want: %s", s, want);
 }
 
 
