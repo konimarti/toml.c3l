@@ -8,6 +8,11 @@ import toml::rfc3339;
 
 def StringList = List(<String>);
 
+fault ParserError
+{
+	ERROR
+}
+
 struct Parser
 {
 	String s;
@@ -171,34 +176,7 @@ fn Object*! Parser.value(&self)
 			io::printfn("line %d: expected value 'inf' but did not match", self.line);
 			return object::new_null();
 		case '[':
-			// consume '['
-			self.read_byte()!; 
-
-			Object* e;
-			Object* arr = object::new_obj(self.allocator);
-			while LOOP: (1)
-			{
-				if (catch self.skip_ws_comment_newline()) break LOOP;
-
-				e = self.value()!;
-
-				if (catch self.skip_ws_comment_newline()) break LOOP;
-
-				switch (self.peek())
-				{
-					case ',':
-						self.read_byte()!;
-					case ']':
-						if (!e.is_null()) arr.push_object(e);
-						break LOOP;
-				}
-				arr.push_object(e);
-			}
-
-			// consume ']'
-			self.read_byte()!;
-
-			return arr;
+			return self.array();
 		case '{':
 			// consume '{'
 			self.read_byte()!; 
