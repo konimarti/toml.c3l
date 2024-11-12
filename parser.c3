@@ -27,11 +27,7 @@ fn Parser* Parser.init(&self, String s, Allocator allocator)
 	return self;
 }
 
-fn void Parser.free(&self)
-{
-	self.buf.free();
-
-}
+fn void Parser.free(&self) => self.buf.free();
 
 fn char! Parser.advance(&self) => self.read_byte();
 
@@ -184,7 +180,7 @@ fn void! Parser.literal_string(&self)
 // mlb-unescaped = wschar / 0x21 / 0x23 - 0x5B / 0x5D - 0x7E / non-ascii
 // mlb-escaped-nl = escape ws newline *( wschar / newline )
 // TODO: non-ascii
-fn void! Parser.mlb_content(&self)
+fn void! Parser.mlb_content(&self, DString *d)
 {
 	// mlb-content = mlb-char / newline / mlb-escaped-nl
 	char c;
@@ -192,31 +188,39 @@ fn void! Parser.mlb_content(&self)
 	{
 		c = self.peek();
 
-		// mlb-char = mlb-unescaped / escaped 
+		// mlb-char = escaped 
 		if (is_ws(c) || c == 0x21 || (c >= 0x23 && c <= 0x5B) || (c >= 0x5D && c <= 0x7E)) {
-			self.advance()!;
-			continue;
-		} else if (c == ESCAPE)
-		{
-			// TODO: combine basic-string escape code, e.g. fn
-			// bool! self.escape()
-			self.advance()!;
-			self.advance()!;
+			d.append_char(self.advance()!);
 			continue;
 		}
 
 		// newline
 		if (is_newline(c)) {
-			self.advance()!;
+			d.append_char(self.advance()!);
 			continue;
 		}
 
+		// mlb-char = escaped 
 		// mlb-escaped-nl = escape ws newline *( wschar / newline )
 		if (self.must(ESCAPE))
 		{
-			self.skip_ws()!;
-			while (is_newline(self.peek())) self.advance()!;
-			while (is_ws(self.peek()) || is_newline(self.peek())) self.advance()!;
+			switch (self.peek())
+			{
+				case 0x22: // \
+				case 0x5C: // "
+				case 0x62: // b
+				case 0x66: // f
+				case 0x6E: // n
+				case 0x72: // r
+				case 0x74: // t
+					d.append_char(ESCAPE);
+					d.append_char(self.advance()!);
+					continue;
+				default:
+					self.skip_ws()!;
+					while (is_newline(self.peek())) self.advance()!;
+					while (is_ws(self.peek()) || is_newline(self.peek())) self.advance()!;
+			}
 		}
 		
 		break LOOP;
@@ -232,18 +236,26 @@ fn Object*! Parser.ml_basic_string(&self)
 {
 	// ml-basic-string-delim has been read at this point.
 
+	DString d;
+	d.new_init(16, self.allocator);
+	defer d.free();
+
 	// [ newline ]
 	if (is_newline(self.peek())) self.advance()!;
 
 	// ml-basic-body
 	while LOOP: (1)
 	{
-		self.mlb_content()!;
+		self.mlb_content(&d)!;
 
 		// maximum much for quotes, but cannot have more than 5
 		// terminal quotes
 		int i = 0;
-		while (!self.at_end() && self.must('"')) i++;
+		while (!self.at_end() && self.must('"'))
+		{
+			i++;
+			d.append_char('"');
+		}
 		switch 
 		{
 			case i < 3:
@@ -257,13 +269,13 @@ fn Object*! Parser.ml_basic_string(&self)
 	}
 
 	// must have at least 6 chars (""""""") in smallest ml string
-	if (self.current - 6 <= self.start)
+	if (d.len() <= 3)
 	{
 		io::printn("parser error: not enough chars in multiline string");
 		return object::new_string("", self.allocator);
 	}
 
-	return object::new_string(self.text()[3..^4], self.allocator);
+	return object::new_string(d.str_view().strip_end(`"""`), self.allocator);
 }
 
 // string = ml-basic-string / basic-string / ml-literal-string / literal-string

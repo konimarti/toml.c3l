@@ -80,16 +80,14 @@ fn void! parser_value_string() @test
 		},
 		{
 			.name = "multiline basic string with newlines",
-			.input = "\"\"\"hello\\nworld\"\"\"",
-			.want = "hello\\nworld",
+			.input = "\"\"\"hello\nworld\"\"\"",
+			.want = "hello\nworld",
 		},
-		/*
 		{
 			.name = "multiline basic string with escaped newlines",
-			.input = "\"\"\"hello \\ \\nworld\"\"\"",
-			.want = "hello\\nworld",
+			.input = "\"\"\"hello \\ \nworld\"\"\"",
+			.want = "hello world",
 		},
-		*/
 	};
 
 	foreach (i, t : tests)
