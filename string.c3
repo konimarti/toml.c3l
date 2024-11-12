@@ -16,6 +16,8 @@ fn bool escape_seq_char(char c) @inline
 		case 0x6E: // n
 		case 0x72: // r
 		case 0x74: // t
+		case 0x75: // u 4HEXDI>
+		case 0x55: // U 8HEXDIG
 			return true;
 		default:
 			return false;
@@ -162,8 +164,31 @@ fn void! Parser.mlb_content(&self, DString *d)
 		{
 			if (escape_seq_char(self.peek()))
 			{
+				char u;
 				d.append_char(ESCAPE);
-				d.append_char(self.advance()!);
+				d.append_char(u = self.advance()!);
+
+				int n = 0;
+				switch (u)
+				{
+					case 0x75:
+						n = 4;
+					case 0x55:
+						n = 8;
+				}
+
+				for (int i = 0; i < n; i++)
+				{
+					if (self.peek().is_xdigit())
+					{
+						d.append_char(self.advance()!);
+					}
+					else
+					{
+						io::printn("parser error: invalid unicode sequence");
+					}
+				}
+
 				continue;
 			}
 			else
@@ -186,7 +211,6 @@ fn void! Parser.mlb_content(&self, DString *d)
 // escape = 0x5C ; \
 // escape-seq-char = 0x22 / 0x5C / 0x62 / 0x66 / 0x6E / 0x72 / 0x72 / unicode??
 // TODO: non-ascii
-// TODO: escaped unicode
 fn void! Parser.basic_string(&self)
 {
 	while LOOP: (1)
@@ -202,7 +226,30 @@ fn void! Parser.basic_string(&self)
 		if (self.must(ESCAPE)) {
 			if (escape_seq_char(self.peek()))
 			{
-				self.advance()!;
+				char u;
+				u = self.advance()!;
+
+				int n = 0;
+				switch (u)
+				{
+					case 0x75:
+						n = 4;
+					case 0x55:
+						n = 8;
+				}
+
+				for (int i = 0; i < n; i++)
+				{
+					if (self.peek().is_xdigit())
+					{
+						self.advance()!;
+					}
+					else
+					{
+						io::printn("parser error: invalid unicode sequence");
+					}
+				}
+
 				continue;
 			}
 			else
