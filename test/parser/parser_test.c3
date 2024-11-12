@@ -88,6 +88,11 @@ fn void! parser_value_string() @test
 			.input = "\"\"\"hello \\ \nworld\"\"\"",
 			.want = "hello world",
 		},
+		{
+			.name = "multiline literal string with escaped newlines",
+			.input = `'''hello\nworld'''''`,
+			.want = "hello\\nworld''",
+		},
 	};
 
 	foreach (i, t : tests)

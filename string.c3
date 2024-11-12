@@ -51,8 +51,7 @@ fn Object*! Parser.string(&self)
 		}
 		else if (quote == '\'')
 		{
-			// TODO
-			// return self.ml_literal_string()!;
+			return self.ml_literal_string()!;
 		}
 
 		io::printfn("parser error: invalid quote: %c", quote);
@@ -215,6 +214,84 @@ fn void! Parser.basic_string(&self)
 		if (!self.must('"')) 
 		{
 			io::printf("parser error: missing terminating quote");
+		}
+
+		break LOOP;
+	}
+}
+
+// ml-literal-string = ml-literal-string delim [ newline ] ml-literal-body
+//			ml-literal-string-delim
+// ml-literal-string-delim = 3apostrophe
+// ml-literal-body = "mll-content *( mll-quotes 1*mll-content ) [ mll-quotes ]
+fn Object*! Parser.ml_literal_string(&self)
+{
+	// ml-literal-string-delim has been read at this point.
+
+	DString d;
+	d.new_init(16, self.allocator);
+	defer d.free();
+
+	// [ newline ]
+	if (is_newline(self.peek())) self.advance()!;
+
+	// ml-literal-body
+	while LOOP: (1)
+	{
+		self.mll_content(&d)!;
+
+		// maximum much for quotes, but cannot have more than 5
+		// terminal quotes
+		int i = 0;
+		while (!self.at_end() && self.must('\''))
+		{
+			i++;
+			d.append_char('\'');
+		}
+		switch 
+		{
+			case i < 3:
+				continue;
+			case i >= 3 && i < 6:
+				break LOOP;
+			case i >= 6:
+				io::printn("parser error: too many terminal quotes");
+				break LOOP;
+		}
+	}
+
+	// must have at least 3 chars (''') in smallest ml string
+	if (d.len() <= 3)
+	{
+		io::printn("parser error: not enough chars in multiline string");
+		return object::new_string("", self.allocator);
+	}
+
+	return object::new_string(d.str_view().strip_end(`'''`), self.allocator);
+}
+
+// mll-content = mll-char / newline
+// mll-char = 0x09 / 0x20 - 0x26 / 0x28 - 0x7E / non-ascci
+// mll-quotes = 1*2apstrophe
+// TODO: non-ascii
+fn void! Parser.mll_content(&self, DString *d)
+{
+	// mll-content = mll-char / newline
+	char c;
+	while LOOP: (1)
+	{
+		c = self.peek();
+
+		// mll-char
+		if (c == 0x09 || (c >= 0x20 && c <= 0x26) || (c >= 0x28 && c <= 0x7E)) {
+			d.append_char(self.advance()!);
+			continue;
+		}
+
+		// newline
+		if (is_newline(c)) {
+			d.append_char(self.advance()!);
+			continue;
 		}
 
 		break LOOP;
