@@ -108,7 +108,6 @@ fn void! parser_value_string() @test
 		String s = p.init(t.input, allocator::temp()).string()!.s;
 		assert(s == t.want,
 			"test %d [%s]: got: %s, but want: %s", i+1, t.name, s, t.want);
-		p.free();
 	}
 }
 
@@ -119,7 +118,6 @@ fn void! parser_read_multiline_str() @test
 		line with two quotes """""`,
 		allocator::temp(),
 	).string()!.s;
-	defer p.free();
 
 	String want = "multi\n\t\tline with two quotes \"\"";
 	assert(s == want, "got: %s, but want: %s", s, want);
@@ -219,7 +217,6 @@ fn void! parser_value_integer() @test
 		int value = (int)integer.i;
 		assert(value == t.want,
 			"test %d [%s]: got: %d, but want: %d", i+1, t.name, value, t.want);
-		p.free();
 	}
 }
 
@@ -305,6 +302,5 @@ fn void! parser_value_float() @test
 			assert(equals(value, t.want),
 				"test %d [%s]: got: %g, but want: %g", i+1, t.name, value, t.want);
 		}
-		p.free();
 	}
 }
