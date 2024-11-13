@@ -21,13 +21,13 @@ struct Parser
 	int current;
 	int line;
 	DString buf;
-	Object* table;
+	Object* current_table;
 }
 
 fn Parser* Parser.init(&self, String s, Allocator allocator)
 {
 	*self = {.s = s, .allocator = allocator, .start = 0, .current = 0, 
-		.line = 1, .buf = DString{}, .table = null};
+		.line = 1, .buf = DString{}, .current_table = null};
 	self.buf.new_init(16, allocator);
 	return self;
 }
@@ -230,11 +230,11 @@ fn void! Parser.key(&self, StringList *list)
 		}
 
 		if (end <= start) {
-			io::printn("no keys found?");
+			// io::printn("no keys found?");
 			return;
 		}
 
-		io::printfn("adding to list: %s", self.s[start..end]);
+		// io::printfn("adding to list: %s", self.s[start..end]);
 		list.push(self.s[start..end]);
 
 		self.skip_ws()!;
@@ -250,12 +250,12 @@ fn void! Parser.insert(&self, Object *obj, StringList k, Object* v)
 		return IoError.GENERAL_ERROR?;
 	} 
 	String key = k.pop()!;
-	Object *cur = self.create_table(k, obj)!;
+	Object *cur = self.get_table(k, obj)!;
 	cur.set(key, v);
 }
 
 // keyval = key keyval-sep val
-// keyval-sep = ws %0x3D ws ; =
+// keyval-sep = ws '=' ws
 fn void! Parser.keyval(&self, Object *obj)
 {
 	// parse key
@@ -287,41 +287,40 @@ fn void! Parser.keyval(&self, Object *obj)
 	self.insert(obj, key, val)!;
 }
 
-fn Object*! Parser.create_table(&self, StringList tables, Object *cur, bool array = false)
+fn Object*! Parser.get_table(&self, StringList tables, Object *cur, bool create_as_array = false)
 {
-	foreach(table : tables)
-	{
-		if (cur.has_key(table)) {
-			io::printfn(" -- found table : %s", table);
-		} else {
-			io::printfn(" -- create table: %s", table);
-			Object* new_table = object::new_obj(self.allocator);
-			cur.set(table, new_table);
-		}
-		cur = cur.get(table)!;
-	}
-	if (array) {
+	foreach(table : tables) cur = cur.get_or_create_obj(table);
+	if (create_as_array) {
 		cur.push_object(object::new_obj(self.allocator));
 	}
 	if (cur.is_array()) {
 		return cur.get_at(cur.get_len()-1);
 	}
+	
 	return cur;
 }
 
-fn Object*! Parser.parse_table(&self, Object *obj)
+// table = std-table / array-table
+//
+// std-table = std-table-open key std-table-close
+//
+// std-table-open = '[' ws
+// std-table-close = ws ']'
+//
+// array-table = array-table-open key array-table-close
+//
+// array-table-open = '[[' ws
+// array-table-close = ws ']]' ws
+fn Object*! Parser.table(&self, Object *obj)
 {
-	bool is_array = false;
-
-	char c;
-	c = self.read_byte()!;
-	if (c != '[') {
+	if (!self.must('[')) {
 		io::printfn("line %d: expected '[' but got %c", self.line, self.peek());
-		return IoError.GENERAL_ERROR?;
+		return ParserError.ERROR?;
 	}
 
-	is_array = self.peek() == '[';
-	if (is_array) self.read_byte()!;
+	bool create_as_array = self.must('[');
+
+	self.skip_ws()!;
 
 	StringList key;
 	key.new_init(4, self.allocator);
@@ -329,22 +328,18 @@ fn Object*! Parser.parse_table(&self, Object *obj)
 
 	self.key(&key)!;
 
-	Object *cur = self.create_table(key, obj, is_array)!;
+	Object *cur = self.get_table(key, obj, create_as_array)!;
 
 	self.skip_ws()!;
-	c = self.read_byte()!;
-	if (c != ']') {
-		io::printfn("expected ']' but got %c", self.peek());
-		return IoError.GENERAL_ERROR?;
+
+	if (!self.must(']')) {
+		io::printfn("line %d: expected ']' but got %c", self.line, self.peek());
+		return ParserError.ERROR?;
 	}
 
-	if (is_array)
-	{
-		c = self.read_byte()!;
-		if (c != ']') {
-			io::printfn("expected ']' but got %c", self.peek());
-			return IoError.GENERAL_ERROR?;
-		}
+	if (create_as_array && !self.must(']')) {
+		io::printfn("line %d: expected ']' but got %c", self.line, self.peek());
+		return ParserError.ERROR?;
 	}
 
 	return cur;
@@ -360,11 +355,11 @@ fn void! Parser.expression(&self, Object *obj)
 
 	if (self.peek() == '[')
 	{
-		self.table = self.parse_table(obj)!;
+		self.current_table = self.table(obj)!;
 	}
 	else
 	{
-		self.keyval(self.table)!;
+		self.keyval(self.current_table)!;
 	}
 
 	self.skip_ws()!;
@@ -377,7 +372,7 @@ fn void! Parser.expression(&self, Object *obj)
 fn Object*! Parser.toml(&self)
 {
 	Object* obj = object::new_obj(self.allocator);
-	self.table = obj;
+	self.current_table = obj;
 	while LOOP: (1) {
 		if (catch err = self.expression(obj))
 		{
