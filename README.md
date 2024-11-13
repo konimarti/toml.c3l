@@ -1,6 +1,6 @@
-# TOML config in C3
+## TOML config parser for C3
 
-Parse TOML config files.
+Parse TOML config files in C3.
 
 Compatible with TOML version [v1.0.0](https://toml.io/en/v1.0.0).
 
