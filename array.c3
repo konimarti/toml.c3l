@@ -12,11 +12,7 @@ import std::collections::object @public;
 fn Object*! Parser.array(&self)
 {
 	// array-open
-	if (!self.must('['))
-	{
-		io::printn("parser error: expected [");
-		return ParserError.ERROR?;
-	}
+	self.must('[');
 
 	Object* arr = object::new_obj(self.allocator);
 	arr.init_array_if_needed();

@@ -10,7 +10,21 @@ def StringList = List(<String>);
 
 fault ParserError
 {
-	ERROR
+	MULTIPLE_ERRORS,
+	INVALID_BOOLEAN,
+	INVALID_QUOTE,
+	INVALID_TERMINAL_QUOTES,
+	INVALID_ESCAPE_UNICODE,
+	INVALID_ESCAPE_SEQUENCE,
+	INVALID_TOKEN_TYPE,
+	UNCLOSED_INLINE_TABLE,
+	UNCLOSED_STD_TABLE,
+	UNCLOSED_ARRAY_TABLE,
+	UNCLOSED_QUOTE,
+	MISSING_KEYVAL_SEPARATOR,
+	MISSING_TABLE_NAME,
+	MISSING_TERMINAL_QUOTE,
+	MULTILINE_STRING_TOO_SHORT,
 }
 
 struct Parser
@@ -47,19 +61,26 @@ fn bool Parser.at_end(&self)
 	return self.current >= self.s.len;
 }
 
+fn void Parser.error(&self, String msg)
+{
+	io::eprintfn("line %d: %s", self.line, msg)!!;
+}
+
 fn bool is_ws(char c) => (c == 0x20 || c == 0x09);
+
 fn bool is_newline(char c) => (c == 0x0A || c == 0x0D);
+
 fn bool non_ascii(char c) => (c >= 0x80);
+
 fn bool non_eol(char c)
 {
 	return (c == 0x09 || (c >= 0x20 && c <= 0x7F) || non_ascii(c));
 }
+
 fn bool is_unquoted_key(char c)
 {
 	return (c.is_alpha() || c.is_digit() || c == '-' || c == '_');
 }
-
-
 
 fn void! Parser.skip_ws(&self)
 {
@@ -76,8 +97,6 @@ fn void! Parser.skip_comment(&self)
 {
 	if (!self.must('#')) return;
 	while (non_eol(self.peek())) self.advance()!;
-
-	self.start = self.current;
 }
 
 // sw-comment-newline = *( wschar / [comment ] newline )
@@ -98,8 +117,6 @@ fn void! Parser.skip_ws_comment_newline(&self)
 				break LOOP;
 		}
 	}
-
-	self.start = self.current;
 }
 
 fn String Parser.text(&self)
@@ -122,7 +139,8 @@ fn bool! Parser.match(&self, String str)
 
 	foreach (s : str)
 	{
-		if (!self.must(s)) {
+		if (!self.must(s))
+		{
 			self.current = backup;
 			return false;
 		}
@@ -146,8 +164,8 @@ fn Object*! Parser.boolean(&self)
 	}
 	else
 	{
-		io::printfn("line %d: could not parse boolean", self.line);
-		return object::new_null();
+		self.error("could not parse boolean; did you misspell 'true' or 'false'");
+		return ParserError.INVALID_BOOLEAN?;
 	}
 
 	return object::new_bool(value);
@@ -176,8 +194,8 @@ fn Object*! Parser.inline_table(&self)
 
 	if (!self.must('}'))
 	{
-		io::printfn("parser error: expected '}'");
-		return ParserError.ERROR?;
+		self.error("expected '}'");
+		return ParserError.UNCLOSED_INLINE_TABLE?;
 	}
 
 	return table;
@@ -265,8 +283,8 @@ fn void! Parser.keyval(&self, Object *obj)
 	self.skip_ws()!;
 	if (!self.must('='))
 	{
-		io::printfn("line %d: expected '=' but got '%c'", self.line, self.peek());
-		return IoError.GENERAL_ERROR?;
+		self.error("expected '='");
+		return ParserError.MISSING_KEYVAL_SEPARATOR?;
 	}
 	self.skip_ws()!;
 
@@ -302,10 +320,7 @@ fn Object*! Parser.get_table(&self, StringList tables, Object *cur, bool create_
 // array-table-close = ws ']]' ws
 fn Object*! Parser.table(&self, Object *obj)
 {
-	if (!self.must('[')) {
-		io::printfn("line %d: expected '[' but got %c", self.line, self.peek());
-		return ParserError.ERROR?;
-	}
+	self.must('[');
 
 	bool create_as_array = self.must('[');
 
@@ -317,8 +332,8 @@ fn Object*! Parser.table(&self, Object *obj)
 
 	if (!self.key(&key)!)
 	{
-		io::printfn("line %d: table must contain a key", self.line);
-		return ParserError.ERROR?;
+		self.error("you must specify a table name between [ and ]");
+		return ParserError.MISSING_TABLE_NAME?;
 	}
 
 	Object *cur = self.get_table(key, obj, create_as_array)!;
@@ -327,12 +342,13 @@ fn Object*! Parser.table(&self, Object *obj)
 
 	if (!self.must(']')) {
 		io::printfn("line %d: expected ']' but got %c", self.line, self.peek());
-		return ParserError.ERROR?;
+		self.error("expected ']'; did you forget to add the closing bracket ']'?");
+		return ParserError.UNCLOSED_STD_TABLE?;
 	}
 
 	if (create_as_array && !self.must(']')) {
-		io::printfn("line %d: expected ']' but got %c", self.line, self.peek());
-		return ParserError.ERROR?;
+		self.error("expected ']]'; did you forget to add an additonal ']'?");
+		return ParserError.UNCLOSED_ARRAY_TABLE?;
 	}
 
 	return cur;
@@ -367,12 +383,23 @@ fn Object*! Parser.toml(&self)
 	Object* obj = object::new_obj(self.allocator);
 	self.current_table = obj;
 
+	anyfault last_error;
 	int max_lines = int.max;
 	while LOOP: (max_lines--) {
 		if (catch err = self.expression(obj))
 		{
 			if (err == IoError.EOF) break LOOP;
-			return err?;
+
+			if (last_error)
+			{
+				last_error = err;
+			} else {
+				last_error = ParserError.MULTIPLE_ERRORS;
+			}
+
+			// synchronize parser after error by moving to the next
+			// newline.
+			while (non_eol(self.peek())) self.advance()!;
 		}
 
 		self.must('\r');
@@ -381,6 +408,7 @@ fn Object*! Parser.toml(&self)
 
 		self.line++;
 	}
+	if (last_error) return last_error?;
 	return obj;
 }
 

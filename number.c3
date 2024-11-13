@@ -63,7 +63,8 @@ fn Object*! Parser.number_or_datetime(&self)
 		case DATETIME:
 			return object::new_string(str, self.allocator);
 		default:
-			return ParserError.ERROR?;
+			self.error("invalid token type in parsing a number of a datetime.");
+			return ParserError.INVALID_TOKEN_TYPE?;
 	}
 }
 

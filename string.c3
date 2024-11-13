@@ -40,11 +40,13 @@ fn Object*! Parser.string(&self)
 {
 	self.start = self.current;
 
-	char quote = self.advance()!; // first quote
+	// first quote
+	char quote = self.advance()!;
 
-	if (self.must(quote)) { // second quote
+	// second quote
+	if (self.must(quote)) {
 
-		// if no third quote is around, then return
+		// if no third quote is found, then return empty string.
 		if (!self.must(quote)) return object::new_string("", self.allocator);
 
 		if (quote == '"')
@@ -55,9 +57,12 @@ fn Object*! Parser.string(&self)
 		{
 			return self.ml_literal_string()!;
 		}
+		else
+		{
+			self.error("invalid quote; only use \" and '");
+			return ParserError.INVALID_QUOTE?;
+		}
 
-		io::printfn("parser error: invalid quote: %c", quote);
-		return object::new_string("", self.allocator);
 	}
 	else 
 	{
@@ -75,7 +80,8 @@ fn Object*! Parser.string(&self)
 		}
 		else
 		{
-			io::printfn("parser error: invalid quote: %c", quote);
+			self.error("invalid quote; only use \" and '");
+			return ParserError.INVALID_QUOTE?;
 		}
 
 		return object::new_string(self.text()[1..^2], self.allocator);
@@ -118,16 +124,16 @@ fn Object*! Parser.ml_basic_string(&self)
 			case i >= 3 && i < 6:
 				break LOOP;
 			case i >= 6:
-				io::printn("parser error: too many terminal quotes");
-				break LOOP;
+				self.error("terminal quote sequence is invalid; there are too many..");
+				return ParserError.INVALID_TERMINAL_QUOTES?;
 		}
 	}
 
 	// must have at least 6 chars (""""""") in smallest ml string
 	if (d.len() <= 3)
 	{
-		io::printn("parser error: not enough chars in multiline string");
-		return object::new_string("", self.allocator);
+		self.error("multi-line string is not long enough; did add three quotes on both sides?");
+		return ParserError.MULTILINE_STRING_TOO_SHORT?;
 	}
 
 	return object::new_string(d.str_view().strip_end(`"""`), self.allocator);
@@ -185,7 +191,8 @@ fn void! Parser.mlb_content(&self, DString *d)
 					}
 					else
 					{
-						io::printn("parser error: invalid unicode sequence");
+						self.error("invalid escaped unicode sequence");
+						return ParserError.INVALID_ESCAPE_UNICODE?;
 					}
 				}
 
@@ -248,7 +255,8 @@ fn void! Parser.basic_string(&self)
 					}
 					else
 					{
-						io::printn("parser error: invalid unicode sequence");
+						self.error("invalid escaped unicode sequence");
+						return ParserError.INVALID_ESCAPE_UNICODE?;
 					}
 				}
 
@@ -256,13 +264,15 @@ fn void! Parser.basic_string(&self)
 			}
 			else
 			{
-				io::printf("parser error: invalid escape sequence");
+				self.error("invalid escape sequence");
+				return ParserError.INVALID_ESCAPE_SEQUENCE?;
 			}
 		}
 
 		if (!self.must('"')) 
 		{
-			io::printf("parser error: missing terminating quote");
+			self.error("missing closing quote \"");
+			return ParserError.UNCLOSED_QUOTE?;
 		}
 
 		break LOOP;
@@ -304,16 +314,16 @@ fn Object*! Parser.ml_literal_string(&self)
 			case i >= 3 && i < 6:
 				break LOOP;
 			case i >= 6:
-				io::printn("parser error: too many terminal quotes");
-				break LOOP;
+				self.error("terminal apostrophe sequence is invalid; there are too many..");
+				return ParserError.INVALID_TERMINAL_QUOTES?;
 		}
 	}
 
 	// must have at least 3 chars (''') in smallest ml string
 	if (d.len() <= 3)
 	{
-		io::printn("parser error: not enough chars in multiline string");
-		return object::new_string("", self.allocator);
+		self.error("multi-line string is not long enough; did add three apostrophes on both sides?");
+		return ParserError.MULTILINE_STRING_TOO_SHORT?;
 	}
 
 	return object::new_string(d.str_view().strip_end(`'''`), self.allocator);
@@ -360,7 +370,8 @@ fn void! Parser.literal_string(&self)
 		{
 			if (!self.must('\'')) 
 			{
-				io::printf("parser error: missing terminating quote");
+				self.error("missing closing apostrophe '");
+				return ParserError.UNCLOSED_QUOTE?;
 			}
 			return;
 		}
