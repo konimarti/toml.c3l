@@ -392,9 +392,9 @@ fn Object*! Parser.toml(&self)
 
 			if (last_error)
 			{
-				last_error = err;
-			} else {
 				last_error = ParserError.MULTIPLE_ERRORS;
+			} else {
+				last_error = err;
 			}
 
 			// synchronize parser after error by moving to the next
