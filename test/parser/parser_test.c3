@@ -1,7 +1,9 @@
 module toml_test @test;
 
 import toml;
+
 import std::io;
+import std::math;
 import std::collections::object;
 
 fn void! test_parser() @test
@@ -145,4 +147,164 @@ fn void! parser_array_tables() @test
 	Object* obj = p.toml()!;
 	io::printn(obj);
 	assert(obj.get("product")!.get_len() == 3, "not enough elements in array");
+}
+
+struct IntegerTestCase
+{
+	String name;
+	String input;
+	int want;
+}
+
+fn void! parser_value_integer() @test
+{
+	IntegerTestCase[] tests = {
+		{
+			.name = "dec-int 1",
+			.input = `123`,
+			.want = 123,
+		},
+		{
+			.name = "dec-int minus",
+			.input = `-123`,
+			.want = -123,
+		},
+		{
+			.name = "dec-int plus",
+			.input = `+123`,
+			.want = 123,
+		},
+		{
+			.name = "dec-int zero",
+			.input = `0`,
+			.want = 0,
+		},
+		{
+			.name = "dec-int with underscore",
+			.input = `1_000_000`,
+			.want = 1000000,
+		},
+		{
+			.name = "hex-int",
+			.input = `0xbeef`,
+			.want = 48879,
+		},
+		{
+			.name = "hex-int case",
+			.input = `0XbEeF`,
+			.want = 48879,
+		},
+		{
+			.name = "hex-int with underscore",
+			.input = `0Xbe_ef`,
+			.want = 48879,
+		},
+		{
+			.name = "oct-int",
+			.input = `0o644`,
+			.want = 420,
+		},
+		{
+			.name = "bin-int",
+			.input = `0b1001`,
+			.want = 9,
+		},
+	};
+
+	foreach (i, t : tests)
+	{
+		toml::parser::Parser p;
+		Object *integer = p.init(t.input, allocator::temp()).number_or_datetime()!;
+		assert(integer.is_int(), "test %d [%s]: object value is not an integer", i+1, t.name);
+		int value = (int)integer.i;
+		assert(value == t.want,
+			"test %d [%s]: got: %d, but want: %d", i+1, t.name, value, t.want);
+		p.free();
+	}
+}
+
+struct FloatTestCase
+{
+	String name;
+	String input;
+	double want;
+}
+
+fn void! parser_value_float() @test
+{
+	FloatTestCase[] tests = {
+		{
+			.name = "float",
+			.input = `123.456`,
+			.want = 123.456,
+		},
+		{
+			.name = "float with underscore",
+			.input = `1_2_3.4_5_6`,
+			.want = 123.456,
+		},
+		{
+			.name = "float minus",
+			.input = `-123.456`,
+			.want = -123.456,
+		},
+		{
+			.name = "float exp 0",
+			.input = `1e0`,
+			.want = 1,
+		},
+		{
+			.name = "float exp 2",
+			.input = `1e2`,
+			.want = 100,
+		},
+		{
+			.name = "float exp -2",
+			.input = `1e-2`,
+			.want = 0.01,
+		},
+		{
+			.name = "float exp 2 with frac",
+			.input = `1.1e2`,
+			.want = 110,
+		},
+		{
+			.name = "float nan",
+			.input = `nan`,
+			.want = float.nan,
+		},
+		{
+			.name = "float -nan",
+			.input = `-nan`,
+			.want = -float.nan,
+		},
+		{
+			.name = "float +inf",
+			.input = `+inf`,
+			.want = float.inf,
+		},
+		{
+			.name = "float -inf",
+			.input = `-inf`,
+			.want = -float.inf,
+		},
+	};
+
+	foreach (i, t : tests)
+	{
+		toml::parser::Parser p;
+		Object *real = p.init(t.input, allocator::temp()).number_or_datetime()!;
+		assert(real.is_float(), "test %d [%s]: object value is not a double", i+1, t.name);
+		double value = (double)real.f;
+		if (math::is_nan(t.want))
+		{
+			assert(math::is_nan(value), "test %d [%s]: value is not a nan", i+1, t.name);
+		}
+		else 
+		{
+			assert(equals(value, t.want),
+				"test %d [%s]: got: %g, but want: %g", i+1, t.name, value, t.want);
+		}
+		p.free();
+	}
 }

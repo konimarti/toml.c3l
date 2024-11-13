@@ -1,5 +1,6 @@
-module toml::parser
+module toml::parser;
 
+import std::ascii;
 import std::collections::object;
 
 // integer = dec-int / hex-int / oct-int / bin-int
@@ -30,118 +31,170 @@ import std::collections::object;
 //
 // special-float = [ minus / plus ] ( inf / nan )
 
-fn Object*! Parser.number_or_datetime()
+enum TokenType
 {
-	int integer = self.integer()!;
-
+	INTEGER,
+	FLOAT,
+	DATETIME
 }
 
-fn int Parser.hex_int(&self)
+struct Token
 {
+	TokenType type;
 	DString s;
-	s.new_init(8, self.allocator);
-	defer s.free();
-
-	s.append_chars("0x");
-	
-	char c;
-	while LOOP: (1)
-	{
-		c = self.peek();
-		switch
-		{
-			case c.is_xdigit(): 
-				s.append_char(self.advance()!);
-			case c == '_':
-				self.advance()!;
-			default:
-				break LOOP;
-		}
-	}
-	return s.str_view().to_int();
 }
 
-fn int Parser.oct_int(&self)
+fn Object*! Parser.number_or_datetime(&self)
 {
-	DString s;
-	s.new_init(8, self.allocator);
-	defer s.free();
+	Token tok;
 
-	s.append_chars("0o");
-	
-	char c;
-	while LOOP: (1)
+	tok.s.new_init(16, self.allocator);
+	defer tok.s.free();
+
+	self.integer(&tok)!;
+
+	String str = tok.s.str_view();
+	switch (tok.type)
 	{
-		c = self.peek();
-		switch
-		{
-			case c.is_odigit(): 
-				s.append_char(self.advance()!);
-			case c == '_':
-				self.advance()!;
-			default:
-				break LOOP;
-		}
+		case INTEGER:
+			return object::new_int(str.to_int()!, self.allocator);
+		case FLOAT:
+			return object::new_float(str.to_double()!, self.allocator);
+		case DATETIME:
+			return object::new_string(str, self.allocator);
+		default:
+			return ParserError.ERROR?;
 	}
-	return s.str_view().to_int();
 }
 
-fn int Parser.bin_int(&self)
+fn void! Parser.integer(&self, Token *tok)
 {
-	DString s;
-	s.new_init(8, self.allocator);
-	defer s.free();
-
-	s.append_chars("0b");
-	
-	char c;
-	while LOOP: (1)
-	{
-		c = self.peek();
-		switch
-		{
-			case c.is_bdigit(): 
-				s.append_char(self.advance()!);
-			case c == '_':
-				self.advance()!;
-			default:
-				break LOOP;
-		}
-	}
-	return s.str_view().to_int();
-}
-
-fn int! Parser.integer(bool *is_number)
-{
+	tok.type = TokenType.INTEGER;
 	switch (self.peek())
 	{
+		case '_':
+			self.advance()!;
+			self.integer(tok)!;
 		case '+':
+		case '0'..'9':
+			tok.s.append_char(self.advance()!);
+			self.integer(tok)!;
+		case 'x':
+		case 'X':
+			tok.s.append_char(self.advance()!);
+			self.hex_int(tok.s)!;
+		case 'o':
+		case 'O':
+			tok.s.append_char(self.advance()!);
+			self.oct_int(tok.s)!;
+		case 'b':
+		case 'B':
+			tok.s.append_char(self.advance()!);
+			self.bin_int(tok.s)!;
+		case 'n':
+		case 'i':
+		case 'e':
+		case '.':
+			self.parse_float(tok)!;
+		case 't':
+		case 'T':
+		case ':':
+			self.date_time(tok)!;
 		case '-':
-		case '1'..'9':
-			is_number = true;
-			return self.dec_int();
-		case '0':
-			switch (self.peek())
+			// can be either int or date_time
+			tok.s.append_char(self.advance()!);
+			if (tok.s.len() > 4)
 			{
-				case 'x':
-					is_number = true;
-					return self.hex_int();
-				case 'o':
-					is_number = true;
-					return self.oct_int();
-				case 'b':
-					is_number = true;
-					return self.bin_int();
-				default:
-					if (!self.peek().is_digit())
-					{
-						is_number = true;
-						return 0;
-					}
+				self.date_time(tok)!;
+			}
+			else
+			{
+				self.integer(tok)!;
 			}
 	}
 
-	is_number = false;
-	return 0;
+	return;
 }
+
+// float = float-int-part ( exp / frac [ exp ] )
+// float = special-float
+//
+// float-int-part = dec-int
+// frac = decimal-point zero-prefixable-int
+// decimal-point = 0x2E ; .
+// zero-prefixable-int = DIGIT *( DIGIT / underscore DIGIT )
+//
+// exp = "e" float-exp-par
+// float-exp-part = [ minux / plus ] zero-prefixable-int
+//
+// special-float = [ minus / plus ] ( inf / nan )
+//
+fn void! Parser.parse_float(&self, Token *tok)
+{
+	tok.type = FLOAT;
+
+	// at this point, dec-int part already parsed in tok.s
+	switch (self.peek())
+	{
+		case '_':
+			self.advance()!;
+		case '+':
+		case '-':
+		case 'e':
+		case '.':
+		case '0'..'9':
+			tok.s.append_char(self.advance()!);
+		case 'n':
+			if (self.match("nan")!) tok.s.append_chars("nan");
+			return;
+		case 'i':
+			if (self.match("inf")!) tok.s.append_chars("infinity");
+			return;
+		default:
+			return;
+	}
+	self.parse_float(tok)!;
+}
+
+fn void! Parser.date_time(&self, Token *tok)
+{
+	tok.type = DATETIME;
+	switch (self.peek())
+	{
+		case '0'..'9':
+		case 't':
+		case 'T':
+		case ':':
+		case '+':
+		case '-':
+			tok.s.append_char(self.advance()!);
+			self.date_time(tok)!;
+		default:
+			return;
+	}
+}
+
+def Accept = fn bool(char);
+
+fn void! Parser.parse_int(&self, DString s, Accept accept)
+{
+	char c;
+	while LOOP: (1)
+	{
+		c = self.peek();
+		switch
+		{
+			case accept(c): 
+				s.append_char(self.advance()!);
+			case c == '_':
+				self.advance()!;
+			default:
+				break LOOP;
+		}
+	}
+}
+
+fn void! Parser.hex_int(&self, DString s) => self.parse_int(s, &ascii::is_xdigit)!;
+fn void! Parser.oct_int(&self, DString s) => self.parse_int(s, &ascii::is_odigit)!;
+fn void! Parser.bin_int(&self, DString s) => self.parse_int(s, &ascii::is_bdigit)!;
 
