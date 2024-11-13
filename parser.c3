@@ -161,22 +161,6 @@ fn Object*! Parser.value(&self)
 		case 't':
 		case 'f':
 			return self.boolean()!;
-		/* FIXME MOVE i and n to float()
-		case 'i':
-			if (self.match("inf")!)
-			{
-				return object::new_float(float.inf, self.allocator);
-			}
-			io::printfn("line %d: expected value 'inf' but did not match", self.line);
-			return object::new_null();
-		case 'n':
-			if (self.match("nan")!)
-			{
-				return object::new_float(float.nan, self.allocator);
-			}
-			io::printfn("line %d: expected value 'inf' but did not match", self.line);
-			return object::new_null();
-		*/
 		case '[':
 			return self.array();
 		case '{':
@@ -207,46 +191,6 @@ fn Object*! Parser.value(&self)
 			return table;
 		default:
 			return self.number_or_datetime();
-		/*
-			String str;
-			while LOOP: (1)
-			{
-				c = self.peek();
-
-				str = self.buf.str_view();
-				if (is_ws(c) && !str.contains(":") && !str.contains("-")) break LOOP;
-				if (is_newline(c)) break LOOP;
-
-				switch (c)
-				{
-				 case '#':
-				 case ',':
-				 case ']':
-					 break LOOP;
-				}
-
-				self.read_byte()!;
-				self.buf.append_char(c);
-			}
-			str = self.buf.str_view();
-
-			// io::printfn("converting string '%s'", str);
-
-			int! i = str.to_int();
-			if (try i)
-			{
-				return object::new_int(i, self.allocator);
-			}
-			if (catch err = i)
-			{
-				// io::printfn("conversion to int failed: %s", err);
-			}
-
-			double! f = str.to_double();
-			if (try f) return object::new_float(f, self.allocator);
-
-			return object::new_string(str, self.allocator);
-		*/
 	}
 }
 
