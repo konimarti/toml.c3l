@@ -213,6 +213,8 @@ fn void! Parser.mlb_content(&self, DString *d)
 // TODO: non-ascii
 fn void! Parser.basic_string(&self)
 {
+	// beginning quote is already consumed.
+
 	while LOOP: (1)
 	{
 		// basic-unescaped
@@ -350,6 +352,8 @@ fn void! Parser.mll_content(&self, DString *d)
 // TODO: non-ascii
 fn void! Parser.literal_string(&self)
 {
+	// beginning apostrophe is already consumed.
+
 	while (1)
 	{
 		if (!literal_char(self.peek()))

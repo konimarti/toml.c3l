@@ -65,6 +65,7 @@ fn bool non_eol(char c)
 fn void! Parser.skip_ws(&self)
 {
 	while (is_ws(self.peek())) self.advance()!;
+
 	self.start = self.current;
 }
 
@@ -76,6 +77,7 @@ fn void! Parser.skip_comment(&self)
 {
 	if (!self.must('#')) return;
 	while (non_eol(self.peek())) self.advance()!;
+
 	self.start = self.current;
 }
 
@@ -97,10 +99,11 @@ fn void! Parser.skip_ws_comment_newline(&self)
 				break LOOP;
 		}
 	}
+
 	self.start = self.current;
 }
 
-fn String! Parser.text(&self)
+fn String Parser.text(&self)
 {
 	return self.s[self.start..self.current-1];
 }
@@ -108,13 +111,16 @@ fn String! Parser.text(&self)
 fn bool Parser.must(&self, char c)
 {
 	if (self.peek() != c) return false;
+
 	self.current++;
+
 	return true;
 }
 
 fn bool! Parser.match(&self, String str)
 {
 	int backup = self.current;
+
 	foreach (s : str)
 	{
 		if (!self.must(s)) {
@@ -123,12 +129,14 @@ fn bool! Parser.match(&self, String str)
 		}
 		
 	}
+
 	return true;
 }
 
 fn Object*! Parser.boolean(&self)
 {
 	bool value;
+
 	if (self.match("true")!)
 	{
 		value = true;
@@ -142,6 +150,7 @@ fn Object*! Parser.boolean(&self)
 		io::printfn("line %d: could not parse boolean", self.line);
 		return object::new_null();
 	}
+
 	return object::new_bool(value);
 }
 
@@ -205,50 +214,44 @@ fn bool is_unquoted_key(char c)
 // unquoted-key = 1*( ALPHA / DIGIT / 0x2d / 0x5F); A-Z / a-z / 0-9 / - / _
 // quoted-key = basic-string / literal-string
 // dotted-key = simple-key 1*( dot-sep simple-key )
-fn void! Parser.key(&self, StringList *list)
+//
+// Returns true when keys were parsed.
+fn bool! Parser.key(&self, StringList *list)
 {
-	int start, end;
-	char c;
 	while (1)
 	{
-		start = self.current;
-
 		self.skip_ws()!;
-		c = self.peek();
 
-		if (c == '"' || c == '\'') {
-			// quoted key
-			char quote = self.advance()!;
-			while (self.peek() != quote) self.advance()!;
-			self.must(quote);
-			start = start + 1;
-			end = self.current - 2;
-		} else {
-			// unquoted key
+		self.start = self.current;
+
+		if (self.must('"'))
+		{
+			// quoted-key: basic-string
+			self.basic_string()!;
+		}
+		else if (self.must('\''))
+		{
+			// quoted-key: literal-string
+			self.literal_string()!;
+		}
+		else
+		{
+			// unquoted-key
 			while (is_unquoted_key(self.peek())) self.advance()!;
-			end = self.current-1;
 		}
 
-		if (end <= start) {
-			// io::printn("no keys found?");
-			return;
-		}
+		if (self.current <= self.start) return !list.is_empty();
 
-		// io::printfn("adding to list: %s", self.s[start..end]);
-		list.push(self.s[start..end]);
+		list.push(self.text());
 
 		self.skip_ws()!;
-		if (!self.must('.')) return;
+
+		if (!self.must('.')) return !list.is_empty();
 	}
 }
 
 fn void! Parser.insert(&self, Object *table, StringList k, Object* v)
 {
-	if (k.len() == 0)
-	{
-		io::printn("parser error: cannot insert object: empty key");
-		return IoError.GENERAL_ERROR?;
-	} 
 	String key = k.pop()!;
 	self.get_table(k, table)!.set(key, v);
 }
@@ -257,19 +260,12 @@ fn void! Parser.insert(&self, Object *table, StringList k, Object* v)
 // keyval-sep = ws '=' ws
 fn void! Parser.keyval(&self, Object *obj)
 {
-	// parse key
-
-	// key is a list of table
 	StringList key;
 	key.new_init(4, self.allocator);
-	defer { key.free(); }
+	defer key.free();
 
-	self.key(&key)!;
-
-	if (key.len() == 0) {
-		// io::printn("empty keys..");
-		return;
-	}
+	// parse key
+	if (!self.key(&key)!) return;
 
 	// consume ws '=' ws
 	self.skip_ws()!;
@@ -325,7 +321,11 @@ fn Object*! Parser.table(&self, Object *obj)
 	key.new_init(4, self.allocator);
 	defer key.free();
 
-	self.key(&key)!;
+	if (!self.key(&key)!)
+	{
+		io::printfn("line %d: table must contain a key", self.line);
+		return ParserError.ERROR?;
+	}
 
 	Object *cur = self.get_table(key, obj, create_as_array)!;
 
@@ -372,22 +372,20 @@ fn Object*! Parser.toml(&self)
 {
 	Object* obj = object::new_obj(self.allocator);
 	self.current_table = obj;
-	while LOOP: (1) {
+
+	int max_lines = int.max;
+	while LOOP: (max_lines--) {
 		if (catch err = self.expression(obj))
 		{
 			if (err == IoError.EOF) break LOOP;
 			return err?;
 		}
+
 		self.must('\r');
-		if (self.must('\n'))
-		{
-			self.line++;
-		}
-		else
-		{
-			io::printn("parser: expected newline");
-			if (self.at_end()) break LOOP;
-		}
+
+		if (!self.must('\n')) break LOOP;
+
+		self.line++;
 	}
 	return obj;
 }
