@@ -30,17 +30,10 @@ fn Parser* Parser.init(&self, String s, Allocator allocator)
 	return self;
 }
 
-fn char! Parser.advance(&self) => self.read_byte();
-
-fn char! Parser.read_byte(&self)
+fn char! Parser.advance(&self)
 {
 	if (self.at_end()) return IoError.EOF?;
 	return self.s[self.current++];
-}
-
-fn void Parser.unread_byte(&self)
-{
-	self.current--;
 }
 
 fn char Parser.peek(&self)
@@ -61,6 +54,12 @@ fn bool non_eol(char c)
 {
 	return (c == 0x09 || (c >= 0x20 && c <= 0x7F) || non_ascii(c));
 }
+fn bool is_unquoted_key(char c)
+{
+	return (c.is_alpha() || c.is_digit() || c == '-' || c == '_');
+}
+
+
 
 fn void! Parser.skip_ws(&self)
 {
@@ -201,11 +200,6 @@ fn Object*! Parser.value(&self)
 		default:
 			return self.number_or_datetime();
 	}
-}
-
-fn bool is_unquoted_key(char c)
-{
-	return (c.is_alpha() || c.is_digit() || c == '-' || c == '_');
 }
 
 // key = simple-key / dotted-key

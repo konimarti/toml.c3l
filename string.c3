@@ -40,7 +40,7 @@ fn Object*! Parser.string(&self)
 {
 	self.start = self.current;
 
-	char quote = self.read_byte()!; // first quote
+	char quote = self.advance()!; // first quote
 
 	if (self.must(quote)) { // second quote
 
