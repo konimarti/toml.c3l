@@ -10,7 +10,7 @@ def StringList = List(<String>);
 
 fault ParserError
 {
-	MULTIPLE_ERRORS,
+	DUPLICATED_KEY,	
 	INVALID_BOOLEAN,
 	INVALID_QUOTE,
 	INVALID_TERMINAL_QUOTES,
@@ -25,6 +25,7 @@ fault ParserError
 	MISSING_TABLE_NAME,
 	MISSING_TERMINAL_QUOTE,
 	MULTILINE_STRING_TOO_SHORT,
+	MULTIPLE_ERRORS,
 }
 
 struct Parser
@@ -265,7 +266,13 @@ fn bool! Parser.key(&self, StringList *list)
 fn void! Parser.insert(&self, Object *table, StringList k, Object* v)
 {
 	String key = k.pop()!;
-	self.get_table(k, table)!.set(key, v);
+	Object* target = self.get_table(k, table)!;
+	if (target.has_key(key))
+	{
+		self.error("key is already used; duplicated keys are not supported.");
+		return ParserError.DUPLICATED_KEY?;
+	}
+	target.set(key, v);
 }
 
 // keyval = key keyval-sep val
