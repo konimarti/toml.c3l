@@ -1,6 +1,6 @@
-# TOML config in C3
+## TOML config parser for C3
 
-Parse TOML config files.
+Parse TOML config files in C3.
 
 Compatible with TOML version [v1.0.0](https://toml.io/en/v1.0.0).
 
@@ -11,28 +11,27 @@ compiled from the project root directory with `c3c build cmd/tomlv.c3 *.c3`.
 ### Usage
 
 TOML config files can be parsed from either a `String` or a `InStream`
-variables.
+variable.
 
-* Read data from `String s`:
+Read data from `String s`:
 ```
 Config c = toml::from_string(s)!;
 defer c.free();
 ```
 
-* Read data from `InStream in`:
+Read data from `InStream in`:
 ```
 Config c = toml::from_stream(in)!;
 defer c.free();
 ```
 
-* Config values can be acces with a dotted key notation.
-
-In the following TOML example config,
+Config values can be acces with a dotted key notation.
+Consider the following TOML config example:
 ```cpp
 [fruit]
 color = 0x3AA832
 ```
-the `color` value can be obtained with `c.get("fruit.color")`. The get function
+The `color` value can be obtained with `c.get("fruit.color")`. The get function
 returns a `std::collections::Object`.
 
 
@@ -46,13 +45,13 @@ import toml;
 
 fn void! main()
 {	
-	String input = `
-	# toml config file
+	String s =
+    `# toml config file
 	title = "TOML example"
 	[database]
 	ports = [8000, 8001, 8002]`;
 
-	Config c = toml::from_string(input)!;
+	Config c = toml::from_string(s)!;
 	defer c.free();
 
 	io::printfn("title: %s", c.get("title")!);
