@@ -20,19 +20,15 @@ struct Parser
 	int start;
 	int current;
 	int line;
-	DString buf;
 	Object* current_table;
 }
 
 fn Parser* Parser.init(&self, String s, Allocator allocator)
 {
 	*self = {.s = s, .allocator = allocator, .start = 0, .current = 0, 
-		.line = 1, .buf = DString{}, .current_table = null};
-	self.buf.new_init(16, allocator);
+		.line = 1, .current_table = null};
 	return self;
 }
-
-fn void Parser.free(&self) => self.buf.free();
 
 fn char! Parser.advance(&self) => self.read_byte();
 
@@ -149,11 +145,39 @@ fn Object*! Parser.boolean(&self)
 	return object::new_bool(value);
 }
 
+// inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
+// inline-table-open = '[' ws
+// inline-table-close = ws ']'
+// inline-table-sep = ws ',' ws
+// inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
+fn Object*! Parser.inline_table(&self)
+{
+	self.must('{');
+
+	Object* table = object::new_obj(self.allocator);
+	while LOOP: (1)
+	{
+		self.skip_ws()!;
+
+		self.keyval(table)!;
+
+		self.skip_ws()!;
+
+		if (!self.must(',')) break LOOP;
+	}
+
+	if (!self.must('}'))
+	{
+		io::printfn("parser error: expected '}'");
+		return ParserError.ERROR?;
+	}
+
+	return table;
+}
+
 fn Object*! Parser.value(&self)
 {
-	self.buf.clear(); // TODO: try to remove that statement?
-	char c = self.peek();
-	switch (c)
+	switch (self.peek())
 	{
 		case '"':
 		case '\'':
@@ -164,31 +188,7 @@ fn Object*! Parser.value(&self)
 		case '[':
 			return self.array();
 		case '{':
-			// consume '{'
-			self.read_byte()!; 
-
-			Object* table = object::new_obj(self.allocator);
-			while LOOP: (1)
-			{
-				if (catch self.skip_ws()) break LOOP;
-
-				self.keyval(table)!;
-
-				if (catch self.skip_ws()) break LOOP;
-
-				switch (self.peek())
-				{
-					case ',':
-						self.read_byte()!;
-					case '}':
-						break LOOP;
-				}
-			}
-
-			// consume '}'
-			self.read_byte()!;
-
-			return table;
+			return self.inline_table();
 		default:
 			return self.number_or_datetime();
 	}
@@ -242,16 +242,15 @@ fn void! Parser.key(&self, StringList *list)
 	}
 }
 
-fn void! Parser.insert(&self, Object *obj, StringList k, Object* v)
+fn void! Parser.insert(&self, Object *table, StringList k, Object* v)
 {
 	if (k.len() == 0)
 	{
-		io::printn("no keys!!");
+		io::printn("parser error: cannot insert object: empty key");
 		return IoError.GENERAL_ERROR?;
 	} 
 	String key = k.pop()!;
-	Object *cur = self.get_table(k, obj)!;
-	cur.set(key, v);
+	self.get_table(k, table)!.set(key, v);
 }
 
 // keyval = key keyval-sep val
