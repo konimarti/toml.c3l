@@ -1,4 +1,4 @@
-module app;
+module tomltest;
 
 import std::io;
 import toml;

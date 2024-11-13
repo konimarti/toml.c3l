@@ -1,4 +1,4 @@
-module linter;
+module tomlv;
 
 import std::io;
 import toml;
@@ -11,6 +11,6 @@ fn void main()
 		io::printfn("Error: %s", err);
 		return;
 	}
-	io::printn("TOML config file can be parsed.");
+	io::printn("TOML config is valid.");
 	c.free();
 }
