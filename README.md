@@ -1,45 +1,61 @@
 # TOML config in C3
 
-Parse TOML config files according to the [toml spec](https://toml.io/en/v1.0.0).
+Parse TOML config files.
 
-### Install
+Compatible with TOML version [v1.0.0](https://toml.io/en/v1.0.0).
 
-Add the path to the `toml.c3l` folder to `dependency-search-paths` and
-`toml` to `dependencies` in your `project.json` file:
+It also comes with a TOML validator CLI tool `tomlv`. The validator tool can be
+compiled from the project root directory with `c3c build cmd/tomlv.c3 *.c3`.
+`tomlv` will validate a TOML config file that is read from stdin.
 
-```json
-{
-    "dependency-search-paths": ["lib", "<path_to_toml.c3l_folder>"],
-    "dependencies": ["toml"]
+### Usage
+
+TOML config files can be parsed from either a `String` or a `InStream`
+variables.
+
+* Read data from `String s`:
+```
+Config c = toml::from_string(s)!;
+defer c.free();
+```
+
+* Read data from `InStream in`:
+```
+Config c = toml::from_stream(in)!;
+defer c.free();
+```
+
+* Config values can be acces with a dotted key notation.
+
+In the following TOML example config,
+```cpp
+[fruit]
+color = 0x3AA832
+```
+the `color` value can be obtained with `c.get("fruit.color")`. The get function
+returns a `std::collections::Object`.
+
+
+### Example
+
+```cpp
+module app;
+
+import std::io;
+import toml;
+
+fn void! main()
+{	
+	String input = `
+	# toml config file
+	title = "TOML example"
+	[database]
+	ports = [8000, 8001, 8002]`;
+
+	Config c = toml::from_string(input)!;
+	defer c.free();
+
+	io::printfn("title: %s", c.get("title")!);
+	io::printfn("ports: %s", c.get("database.ports")!);
 }
-```
-
-### Examples
-
-```
-c3c compile-run example/toml-test.c3 . <<EOF
-# This is a TOML document
-
-title = "TOML Example"
-
-[owner]
-name = "Tom Preston-Werner"
-dob = 1979-05-27T07:32:00-08:00
-
-[database]
-enabled = true
-ports = [ 8000, 8001, 8002 ]
-data = [ ["delta", "phi"], [3.14] ]
-temp_targets = { cpu = 79.5, case = 72.0 }
-
-[servers]
-
-[servers.alpha]
-ip = "10.0.0.1"
-role = "frontend"
-
-[servers.beta]
-ip = "10.0.0.2"
-role = "backend"
-EOF
 ```
