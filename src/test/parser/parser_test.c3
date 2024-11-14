@@ -1,4 +1,4 @@
-module toml_test @test;
+module toml::parser_test @test;
 
 import toml;
 
@@ -37,7 +37,7 @@ fn void! test_parser_toml_doc() @test
 	toml::parser::Parser scan;	
 	scan.init(TOML_DOC, allocator::temp());
 	Object* obj = scan.toml()!;
-	io::printn(obj);
+	//io::printn(obj);
 
 	Object* owner = obj.get("owner")!;
 	Object* database = obj.get("database")!;
@@ -140,7 +140,7 @@ fn void! parser_array_tables() @test
 	);
 
 	Object* obj = p.toml()!;
-	io::printn(obj);
+	// io::printn(obj);
 	assert(obj.get("product")!.get_len() == 3,
 		"array_tables: incorrect array length");
 }
@@ -154,7 +154,7 @@ fn void! parser_inline_tables() @test
 	);
 
 	Object* obj = p.toml()!;
-	io::printn(obj);
+	// io::printn(obj);
 
 	Object* widget = obj.get("widget")!;
 	Object* vendors = widget.get("vendors")!;

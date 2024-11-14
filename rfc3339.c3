@@ -35,32 +35,6 @@ fn DateTime! parse(String s)
 	return Parser{s}.parse();
 }
 
-module toml::rfc3339_test @test;
-
-import toml::rfc3339;
-import std::io;
-import std::time;
-
-fn void! test_parse_date_time() @test
-{
-	String s = "1996-12-19T16:39:57-08:00";
-	DateTime dt = rfc3339::parse(s)!;
-	io::printfn("\n%s",s);
-	io::printfn("year: %4d, mon: %2d, day: %2d", dt.year, dt.month+1, dt.day);
-	io::printfn("hour: %4d, min: %2d, sec: %2d", dt.hour, dt.min, dt.sec);
-}
-
-fn void! test_parse_utc() @test
-{
-	String s = "1996-12-19T16:39:57Z";
-	DateTime dt = rfc3339::parse(s)!;
-}
-
-fn void! test_parse_utc_frac() @test
-{
-	String s = "1996-12-19T16:39:57.123456Z";
-	DateTime dt = rfc3339::parse(s)!;
-}
 
 module toml::rfc3339::parser @private;
 

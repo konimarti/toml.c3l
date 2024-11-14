@@ -2,11 +2,11 @@
 	"authors": [ "Koni Marti <koni.marti@gmail.com>" ],
 	"version": "0.1.0",
 	"output": "build",
-	"sources": [ "*", "./test/**" ],
+	"sources": [ "*", "src/test/**" ],
 	"targets": {
 		"tomlv": {
 			"type": "executable",
-			"sources": [ "cmd/tomlv/**" ]
+			"sources": [ "src/tomlv/**" ]
 		}
 	}
 }
