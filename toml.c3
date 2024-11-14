@@ -39,15 +39,16 @@ fn void Config.free(&self)
 fn Config! from_file(String filename, Allocator allocator = allocator::heap())
 {
 	File f = file::open(filename, "r")!;
+	defer (void)f.close();
 	Config! cfg = from_stream(&f, allocator)!;
-	f.close()!;
 	return cfg;
 }
 
 fn Config! from_stream(InStream reader, Allocator allocator = allocator::heap())
 {
-	char[] input = io::read_new_fully(reader, allocator::temp())!;
-	return Config{toml::parser::Parser{}.init((String)input, allocator).toml()!};
+	ByteWriter writer;
+	io::copy_to(reader, writer.temp_init())!;
+	return Config{toml::parser::Parser{}.init(writer.str_view(), allocator).toml()!};
 }
 
 fn Config! from_string(String s, Allocator allocator = allocator::heap())
