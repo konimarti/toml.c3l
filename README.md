@@ -43,8 +43,10 @@ is a `std::collections::Object`.
 
 ### Installation
 
-Clone the repository with `git clone http://github.com/konimarti/toml.c3l` to
-the `./lib` folder of your C3 project and add the following to `project.json`:
+Clone the repository with
+```git clone http://github.com/konimarti/toml.c3l```
+to the `./lib` folder of your C3 project and add the following to
+`project.json`:
 
 ```json
 {
@@ -67,7 +69,7 @@ import toml;
 
 fn void! main()
 {	
-	String s = `
+	String s = ` 
     # toml config file
 	title = "TOML example"
 	[database]
