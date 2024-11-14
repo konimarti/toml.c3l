@@ -3,8 +3,8 @@
 Compatible with TOML version [v1.0.0](https://toml.io/en/v1.0.0).
 
 It also comes with a TOML validator CLI tool. The validator tool can be
-compiled from the project root directory with `c3c build cmd/tomlv.c3 *.c3`.
-`tomlv` will validate a TOML config file that is read from stdin.
+compiled with `c3c build tomlv`. `tomlv` will validate a TOML config file that
+is read from stdin.
 
 ### Usage
 
@@ -19,9 +19,7 @@ defer c.free();
 
 Read data from `InStream in`:
 ```
-File f = file::open("test.toml", "r")!;
-..
-Config c = toml::from_stream(&f)!;
+Config c = toml::from_stream(in)!;
 defer c.free();
 ```
 
@@ -39,9 +37,8 @@ For example, the `color` value from the TOML config
 [fruit]
 color = 0x3AA832
 ```
-can be obtained with `c.get("fruit.color")`.
-
-Note that the return value from `Config.get` is a `std::collections::Object`.
+can be obtained with `c.get("fruit.color")`. The return value of `Config.get`
+is a `std::collections::Object`.
 
 
 ### Example
@@ -54,8 +51,8 @@ import toml;
 
 fn void! main()
 {	
-	String s =
-    `# toml config file
+	String s = `
+    # toml config file
 	title = "TOML example"
 	[database]
 	ports = [8000, 8001, 8002]`;
