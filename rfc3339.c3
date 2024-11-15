@@ -30,14 +30,22 @@ import std::time::datetime;
 
 // 1996-12-19T16:39:57-08:00
 
+fault Error
+{
+	INVALID_RFC3339
+}
+
 fn DateTime! parse(String s)
 {
-	return Parser{s}.parse();
+	DateTimeObject dto = Parser{s}.parse()!;
+	if (dto.type == DATETIME) return dto.dt;
+	return Error.INVALID_RFC3339?;
 }
 
 
 module toml::rfc3339::parser @private;
 
+import std::io;
 import std::time::datetime;
 
 fault Error
@@ -45,6 +53,7 @@ fault Error
 	INVALID_DATE_FORMAT,
 	INVALID_INPUT,
 	INVALID_NUMBER,
+	INVALID_TOKEN,
 }
 
 struct Date
@@ -52,17 +61,6 @@ struct Date
 	int year;
 	int month;
 	int day;
-}
-
-fn void! Date.parse(&d, Parser* p)
-{
-	if (p.s.len < 10) return Error.INVALID_INPUT?;
-
-	d.year = p.consumeInt()!;
-	p.consume('-')!;
-	d.month = p.consumeInt()!;
-	p.consume('-')!;
-	d.day = p.consumeInt()!;
 }
 
 struct Time
@@ -74,51 +72,10 @@ struct Time
 	bool utc;
 }
 
-fn void! Time.parse(&t, Parser* p)
-{
-	if (p.s.len < 8) return Error.INVALID_INPUT?;
-
-	t.hour = p.consumeInt()!;
-	p.consume(':')!;
-	t.min = p.consumeInt()!;
-	p.consume(':')!;
-	t.sec = p.consumeInt()!;
-
-	t.us = 0;
-	if (!p.empty() && p.peek() == '.') {
-		p.consume('.')!;
-		t.us = p.consumeInt()!; 
-	}
-
-	if (try p.consume('Z')) t.utc = true;
-}
-
 struct Offset
 {
 	int hour;
 	int min;
-}
-
-fn void! Offset.parse(&o, Parser* p)
-{
-	if (p.s.len < 6) return Error.INVALID_INPUT?;
-
-	int sign;
-	switch (p.peek())
-	{
-		case '+':
-			sign = 1;
-			p.consume('+')!;
-		case '-':
-			sign = -1;
-			p.consume('-')!;
-		default:
-			return;
-	}
-
-	o.hour = sign * p.consumeInt()!;
-	p.consume(':')!;
-	o.min = p.consumeInt()!;
 }
 
 fn int Offset.to_sec(&o)
@@ -138,37 +95,203 @@ struct Parser
 	String s;
 }
 
-fn DateTime! Parser.parse(&p)
+enum TokenType
 {
-	Date d;
-	d.parse(p)!;
+	INTEGER,
+	MINUS,
+	PLUS,
+	COLON,
+	PERIOD,
+	UTC,
+	DATE_TIME_SEP,
+	EOF,
+}
 
-	if (p.peek() == ' ' || p.peek() == 'T') p.consume(p.peek())!;
+struct Token
+{
+	TokenType type;
+	int value;
+}
 
-	Time t;
-	t.parse(p)!;
-
-	DateTime dt = datetime::from_date(
-		d.year, (Month)(d.month-1), d.day, 
-		t.hour, t.min, t.sec, t.us);
-
-	Offset off;
-	if (try off.parse(p))
+fn Token Parser.lex(&p)
+{
+	TokenType t;
+	char c = p.peek();
+	switch (c)
 	{
-		TzDateTime tzdt = dt.to_gmt_offset(off.to_sec());
-		dt = tzdt.date_time;
+		case '0'..'9':
+			return {.type = TokenType.INTEGER,
+				.value = p.consumeInt()!!};
+		case '-':
+			t = TokenType.MINUS;
+		case '+':
+			t = TokenType.PLUS;
+		case ':':
+			t = TokenType.COLON;
+		case '.':
+			t = TokenType.PERIOD;
+		case 'Z':
+		case 'z':
+			t = TokenType.UTC;
+		case 'T':
+		case 't':
+		case ' ':
+			t = TokenType.DATE_TIME_SEP;
+		default:
+			return {.type = TokenType.EOF};
+	}
+	p.consume(c)!!;
+	return {.type = t};
+}
+
+enum DateTimeType
+{
+	DATE,
+	TIME,
+	DATETIME,
+}
+
+struct DateTimeObject
+{
+	DateTimeType type;
+	union
+	{
+		Date d;
+		Time t;
+		DateTime dt;
+	}
+}
+
+struct Three
+{
+	DateTimeType type;
+	int[3] values;
+}
+
+fn Three! Parser.three(&p)
+{
+	Token[5] tokens;
+	for (int i = 0; i < 5; i++)
+	{
+		tokens[i] = p.lex();
+		if (tokens[i].type == EOF) return Error.INVALID_DATE_FORMAT?;
 	}
 
-	return dt;
+	if (tokens[1].type != tokens[3].type) return Error.INVALID_DATE_FORMAT?;
+
+	Three three = { .values = {tokens[0].value, tokens[2].value, tokens[4].value} };
+	switch (tokens[1].type)
+	{
+		case MINUS:
+			three.type = DATE;	
+		case COLON:
+			three.type = TIME;	
+		default:
+			return Error.INVALID_DATE_FORMAT?;
+	}
+	return three;
 }
 
-fn bool Parser.empty(&p)
+struct Attribute
 {
-	return p.s.len == 0;
+	int usec;
+	bool utc;
+	Offset off;
 }
+
+fn Attribute! Parser.attributes(&p)
+{
+	Attribute a;
+	Token tok = p.lex();
+	int sign = 1;
+	switch (tok.type)
+	{
+		case UTC:
+			a.utc = true;
+		case PERIOD:
+			tok = p.lex();
+			if (tok.type != INTEGER) return Error.INVALID_DATE_FORMAT?;
+			a.usec = tok.value;
+		case MINUS:
+			sign = -1;
+			nextcase;
+		case PLUS:
+			a.off.hour = sign*p.lex().value;
+			p.lex();
+			a.off.min = p.lex().value;
+		case EOF:
+			return a;
+		default:
+			return Error.INVALID_DATE_FORMAT?;
+	}
+	return a;
+}
+
+fn DateTimeObject! Parser.parse(&p)
+{
+	Date d;
+	Time t;
+	Offset off;
+	DateTimeObject dto;
+
+	Three first = p.three()!;
+	if (first.type == DATE)
+	{
+		d.year = first.values[0];
+		d.month = first.values[1];
+		d.day = first.values[2];
+		dto.type = DATE;
+
+		Token tok = p.lex();
+		if (tok.type == DATE_TIME_SEP)
+		{
+			first = p.three()!;	
+			dto.type = DATETIME;
+		}
+	}
+
+	if (first.type == TIME)
+ 	{
+		t.hour = first.values[0];
+		t.min = first.values[1];
+		t.sec = first.values[2];
+		if (dto.type != DATETIME) dto.type = TIME;
+
+		Attribute a = p.attributes()!;
+
+		t.us = a.usec;
+		t.utc = a.utc;
+		off = a.off;
+	}
+
+	io::printfn("date: %d-%d-%d", d.year, d.month, d.day);
+	io::printfn("time: %d:%d:%d.%d", t.hour, t.min, t.sec, t.us);
+
+	switch (dto.type)
+	{
+		case DATE:
+			dto.d = d;
+		case TIME:
+			dto.t = t;
+		case DATETIME:
+			dto.dt = datetime::from_date(
+				d.year, (Month)d.month-1, d.day, 
+				t.hour, t.min, t.sec, t.us);
+			if (off.to_sec())
+			{
+				TzDateTime tzdt = dto.dt.to_gmt_offset(off.to_sec());
+				dto.dt = tzdt.date_time;
+			}
+	}
+
+	return dto;
+}
+
+fn bool Parser.empty(&p) => p.s.len == 0;
 
 fn char Parser.peek(&p)
 {
+	if (p.empty()) return '\0';
 	return p.s[0];
 }
 
@@ -190,9 +313,3 @@ fn int! Parser.consumeInt(&p)
 
 	return v;
 }
-
-fn void Parser.skipSpace(&p)
-{
-	while (p.s.len && (p.s[0] == ' ' || p.s[0] == '\t')) p.s = p.s[1..];
-}
-
