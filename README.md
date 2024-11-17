@@ -2,6 +2,9 @@
 
 Compatible with TOML version [v1.0.0](https://toml.io/en/v1.0.0).
 
+Parse TOML config can be decoded into user-defined structs using reflection
+(see [example](#parse-toml-and-decode-to-struct)).
+
 It also comes with a TOML validator CLI tool. The validator tool can be
 compiled with `c3c build tomlv`. `tomlv` will validate a TOML config file that
 is read from stdin.
@@ -59,7 +62,9 @@ If you didn't clone it into the `lib` folder, adjust your
 `dependency-search-paths` accordingly.
 
 
-### Example
+### Examples
+
+#### Parse TOML from String
 
 ```cpp
 module app;
@@ -80,5 +85,50 @@ fn void! main()
 
 	io::printfn("title: %s", c.get("title")!);
 	io::printfn("ports: %s", c.get("database.ports")!);
+}
+```
+
+#### Parse TOML and decode to struct
+
+```cpp
+module tomltest;
+
+import std::io;
+import toml;
+
+struct Fruit
+{
+	String name;
+	int color;
+	double price;
+	int items;
+	bool fresh;
+}
+
+struct TomlConfig
+{
+	String title;
+	Fruit fruit;
+}
+
+fn void! main()
+{	
+	String s = `
+	title = "TOML example"
+
+	[fruit]
+	name = "apple"
+	color = 0xbeef
+	price = 1.32
+	items = 4
+	fresh = true`;
+
+	Config c = toml::from_string(s)!;
+	defer c.free();
+
+	TomlConfig t;
+	c.@decode(t)!;
+	
+	io::printn(t);
 }
 ```
