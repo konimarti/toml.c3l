@@ -86,6 +86,10 @@ fn void! main()
 	io::printfn("title: %s", c.get("title")!);
 	io::printfn("ports: %s", c.get("database.ports")!);
 }
+// Output:
+// title: "TOML example"
+// ports: [8000,8001,8002]
+
 ```
 
 #### Parse TOML and decode to struct
@@ -131,4 +135,6 @@ fn void! main()
 	
 	io::printn(t);
 }
+// Output:
+// { title: TOML example, fruit: { name: apple, color: 48879, price: 1.320000, items: 4, fresh: true } }
 ```
