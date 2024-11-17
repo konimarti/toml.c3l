@@ -2,7 +2,7 @@
 
 Compatible with TOML version [v1.0.0](https://toml.io/en/v1.0.0).
 
-Parse TOML config can be decoded into user-defined structs using reflection
+Parsed TOML config can be decoded into user-defined structs using reflection
 (see [example](#parse-toml-and-decode-to-struct)).
 
 It also comes with a TOML validator CLI tool. The validator tool can be
