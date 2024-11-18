@@ -16,6 +16,7 @@ const TOML_DOC = `
 	dob = 1979-05-27T07:32:00-08:00
 
 	[database]
+	items = 3
 	enabled = true
 	ports = [ 8000, 8001, 8002 ]
 	#data = [ ["delta", "phi"], [3.14] ]
@@ -56,6 +57,7 @@ struct Targets
 
 struct Database
 {
+	int items;
 	bool enabled;
 	Object*[3] ports;
 	Targets temp_targets;
@@ -82,6 +84,7 @@ fn void! test_unmarshal_toml_doc() @test
 	assert(t.owner.name == "Tom Preston-Werner");
 	assert(t.owner.dob == "1979-05-27T07:32:00-08:00");
 
+	assert(t.database.items == 3);
 	assert(t.database.enabled == true);
 	assert(t.database.ports[0].is_int() && t.database.ports[0].i == 8000);
 	assert(t.database.ports[1].is_int() && t.database.ports[1].i == 8001);

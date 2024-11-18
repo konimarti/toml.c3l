@@ -19,6 +19,7 @@ macro void! @unmarshal_obj(&t, m)
 		// io::printfn("nameof: %s", $x.nameof);
 		// io::printfn("kindof: %s", $x.kindof);
 		// io::printfn("typeid: %s", $x.typeid.nameof);
+		// io::printfn("get value of membersof $x: %s", $x.get(*t));
 
 		if (m.has_key($x.nameof))
 		{
@@ -27,7 +28,7 @@ macro void! @unmarshal_obj(&t, m)
 
 		$case TypeKind.STRUCT:
 
-			@unmarshal_obj(t.$eval($x.nameof), m.get($x.nameof)!)!;
+			@unmarshal_obj($x.get(*t), m.get($x.nameof)!)!;
 
 		$case TypeKind.VECTOR:
 		$case TypeKind.ARRAY:
@@ -39,11 +40,13 @@ macro void! @unmarshal_obj(&t, m)
 				return MarshalError.UNSUPPORTED_TYPE?;
 			}
 
-			var $ElementType = $typeof(t.$eval($x.nameof)[0]);
+			var $ElementType = $typefrom($x.typeid.inner);
 
 			// io::printfn("array.len (Type): %d", $x.typeid.len);
 			// io::printfn("array.len (Object): %d", arr.get_len());
-			// io::printfn("array[0].type: %s", $ElementType.nameof);
+			// io::printfn("type of array: %s", $x.typeid.nameof);
+			// io::printfn("type of array[0]: %s", $x.typeid.inner.nameof);
+			// io::printfn("type of array[0]: %s", $ElementType.nameof);
 
 			$if $ElementType.typeid == Object*.typeid:
 				usz n = min(arr.get_len(), $x.typeid.len);
@@ -53,7 +56,7 @@ macro void! @unmarshal_obj(&t, m)
 				}
 				for (usz i = 0; i < n; i++)
 				{
-					t.$eval($x.nameof)[i] = arr.get_at(i);
+					$x.get(*t)[i] = arr.get_at(i);
 				}
 			$else
 				io::eprintfn("TOML Unmarshal Error: type of field '%s' is unsupported; use 'Object*' instead.", $x.nameof);
@@ -62,29 +65,29 @@ macro void! @unmarshal_obj(&t, m)
 
 		$default:
 
-			var $TargetType = $typeof(t.$eval($x.nameof));
+			var $TargetType = $typefrom($x.typeid);
 
 			$switch
 
 				$case types::is_int($TargetType):
 
-					t.$eval($x.nameof) = m.get_int($x.nameof)!;
+					$x.get(*t) = m.get_int($x.nameof)!;
 
 				$case types::is_float($TargetType):
 
-					t.$eval($x.nameof) = m.get_float($x.nameof)!;
+					$x.get(*t) = m.get_float($x.nameof)!;
 
 				$case types::is_bool($TargetType):
 
-					t.$eval($x.nameof) = m.get_bool($x.nameof)!;
+					$x.get(*t) = m.get_bool($x.nameof)!;
 
 				$case $TargetType.typeid == String.typeid:
 
-					t.$eval($x.nameof) = m.get_string($x.nameof)!;
+					$x.get(*t) = m.get_string($x.nameof)!;
 
 			$default:
 
-				t.$eval($x.nameof) = m.get($x.nameof)!;
+				$x.get(*t) = m.get($x.nameof)!;
 
 			$endswitch
 
