@@ -57,7 +57,7 @@ struct Targets
 struct Database
 {
 	bool enabled;
-	Object* ports;
+	Object*[3] ports;
 	Targets temp_targets;
 }
 
@@ -83,6 +83,9 @@ fn void! test_unmarshal_toml_doc() @test
 	assert(t.owner.dob == "1979-05-27T07:32:00-08:00");
 
 	assert(t.database.enabled == true);
+	assert(t.database.ports[0].is_int() && t.database.ports[0].i == 8000);
+	assert(t.database.ports[1].is_int() && t.database.ports[1].i == 8001);
+	assert(t.database.ports[2].is_int() && t.database.ports[2].i == 8002);
 
 	assert(math::abs(t.database.temp_targets.cpu - 79.5) < math::FLOAT_EPSILON);
 	assert(math::abs(t.database.temp_targets._case - 72.0) < math::FLOAT_EPSILON);
