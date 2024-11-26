@@ -56,9 +56,6 @@ fn Config! from_string(String s, Allocator allocator = allocator::heap())
 	return Config{toml::parser::Parser{}.init(s, allocator).toml()!};
 }
 
-macro void! Config.@decode(&self, &t)
-{
-	return @unmarshal_obj(*t, self.table);
-}
+macro void! Config.@unmarshal(&self, &t) => @unmarshal_obj(*t, self.table);
 
 

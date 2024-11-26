@@ -40,7 +40,7 @@ fn void! main()
 	defer c.free();
 
 	TomlConfig t;
-	c.@decode(t)!;
+	c.@unmarshal(t)!;
 	
 	io::printn(t);
 }
