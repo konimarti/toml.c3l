@@ -9,7 +9,7 @@ fault MarshalError
 	UNSUPPORTED_TYPE,
 }
 
-macro void! @unmarshal_obj(&t, m)
+macro void! unmarshal_obj(t, m)
 {
 	var $Type = $typeof(*t);
 
@@ -28,7 +28,7 @@ macro void! @unmarshal_obj(&t, m)
 
 		$case TypeKind.STRUCT:
 
-			@unmarshal_obj($x.get(*t), m.get($x.nameof)!)!;
+			unmarshal_obj(&$x.get(*t), m.get($x.nameof)!)!;
 
 		$case TypeKind.VECTOR:
 		$case TypeKind.ARRAY:
@@ -66,28 +66,29 @@ macro void! @unmarshal_obj(&t, m)
 		$default:
 
 			var $TargetType = $typefrom($x.typeid);
+			String $name = $x.nameof;
 
 			$switch
 
 				$case types::is_int($TargetType):
 
-					$x.get(*t) = m.get_int($x.nameof)!;
+					t.$eval($name) = m.get_int($name)!;
 
 				$case types::is_float($TargetType):
 
-					$x.get(*t) = m.get_float($x.nameof)!;
+					t.$eval($name) = m.get_float($name)!;
 
 				$case types::is_bool($TargetType):
 
-					$x.get(*t) = m.get_bool($x.nameof)!;
+					t.$eval($name) = m.get_bool($name)!;
 
 				$case $TargetType.typeid == String.typeid:
 
-					$x.get(*t) = m.get_string($x.nameof)!;
+					t.$eval($name) = m.get_string($name)!;
 
 			$default:
 
-				$x.get(*t) = m.get($x.nameof)!;
+				t.$eval($name) = m.get($name)!;
 
 			$endswitch
 

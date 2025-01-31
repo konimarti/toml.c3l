@@ -22,7 +22,7 @@ struct TomlConfig
 	Fruit fruit;
 }
 
-fn void! main()
+fn void main()
 {	
 	String s = `
 	title = "TOML example"
@@ -36,11 +36,11 @@ fn void! main()
 	ports =[ 1, "hello", 3, 4]
 	`;
 
-	Config c = toml::from_string(s)!;
+	Config c = toml::from_string(s)!!;
 	defer c.free();
 
 	TomlConfig t;
-	c.@unmarshal(t)!;
+	c.unmarshal(&t)!!;
 	
 	io::printn(t);
 }

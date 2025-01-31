@@ -78,7 +78,7 @@ fn void test_unmarshal_toml_doc() @test
 	Object* obj = scan.toml()!!;
 
 	TomlDoc t;
-	toml::@unmarshal_obj(t, obj)!!;
+	toml::unmarshal_obj(&t, obj)!!;
 
 	assert(t.title == "TOML Example");
 	assert(t.owner.name == "Tom Preston-Werner");

@@ -3,7 +3,7 @@ module tomltest;
 import std::io;
 import toml;
 
-fn void! main()
+fn void main()
 {	
 	String s =
 	`# toml config file
@@ -12,9 +12,9 @@ fn void! main()
 	[database]
 	ports = [8000, 8001, 8002]`;
 
-	Config c = toml::from_string(s)!;
+	Config c = toml::from_string(s)!!;
 	defer c.free();
 
-	io::printfn("title: %s", c.get("title")!);
-	io::printfn("ports: %s", c.get("database.ports")!);
+	io::printfn("title: %s", c.get("title")!!);
+	io::printfn("ports: %s", c.get("database.ports")!!);
 }

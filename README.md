@@ -72,7 +72,7 @@ module app;
 import std::io;
 import toml;
 
-fn void! main()
+fn void main()
 {	
 	String s = ` 
     # toml config file
@@ -80,11 +80,11 @@ fn void! main()
 	[database]
 	ports = [8000, 8001, 8002]`;
 
-	Config c = toml::from_string(s)!;
+	Config c = toml::from_string(s)!!;
 	defer c.free();
 
-	io::printfn("title: %s", c.get("title")!);
-	io::printfn("ports: %s", c.get("database.ports")!);
+	io::printfn("title: %s", c.get("title")!!);
+	io::printfn("ports: %s", c.get("database.ports")!!);
 }
 // Output:
 // title: "TOML example"
@@ -115,7 +115,7 @@ struct TomlConfig
 	Fruit fruit;
 }
 
-fn void! main()
+fn void main()
 {	
 	String s = `
 	title = "TOML example"
@@ -127,11 +127,11 @@ fn void! main()
 	items = 4
 	fresh = true`;
 
-	Config c = toml::from_string(s)!;
+	Config c = toml::from_string(s)!!;
 	defer c.free();
 
 	TomlConfig t;
-	c.@unmarshal(t)!;
+	c.unmarshal(&t)!!;
 	
 	io::printn(t);
 }
