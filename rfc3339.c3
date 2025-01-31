@@ -149,7 +149,7 @@ fn DateTime! Parser.parse(&p)
 	t.parse(p)!;
 
 	DateTime dt = datetime::from_date(
-		d.year, (Month)(d.month-1), d.day, 
+		d.year, Month.from_ordinal(d.month-1), d.day,
 		t.hour, t.min, t.sec, t.us);
 
 	Offset off;

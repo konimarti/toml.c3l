@@ -71,14 +71,14 @@ struct TomlDoc
 	Servers servers;
 }
 
-fn void! test_unmarshal_toml_doc() @test
+fn void test_unmarshal_toml_doc() @test
 {
 	toml::parser::Parser scan;	
 	scan.init(TOML_DOC, allocator::temp());
-	Object* obj = scan.toml()!;
+	Object* obj = scan.toml()!!;
 
 	TomlDoc t;
-	toml::@unmarshal_obj(t, obj)!;
+	toml::@unmarshal_obj(t, obj)!!;
 
 	assert(t.title == "TOML Example");
 	assert(t.owner.name == "Tom Preston-Werner");
