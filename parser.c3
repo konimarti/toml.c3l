@@ -6,11 +6,9 @@ import std::collections::list;
 
 import toml::rfc3339;
 
-def StringList = List(<String>);
+alias StringList = List {String};
 
-fault ParserError
-{
-	DUPLICATED_KEY,	
+faultdef DUPLICATED_KEY,
 	INVALID_BOOLEAN,
 	INVALID_QUOTE,
 	INVALID_TERMINAL_QUOTES,
@@ -25,8 +23,7 @@ fault ParserError
 	MISSING_TABLE_NAME,
 	MISSING_TERMINAL_QUOTE,
 	MULTILINE_STRING_TOO_SHORT,
-	MULTIPLE_ERRORS,
-}
+	MULTIPLE_ERRORS;
 
 struct Parser
 {
@@ -45,9 +42,9 @@ fn Parser* Parser.init(&self, String s, Allocator allocator)
 	return self;
 }
 
-fn char! Parser.advance(&self)
+fn char? Parser.advance(&self)
 {
-	if (self.at_end()) return IoError.EOF?;
+	if (self.at_end()) return io::EOF?;
 	return self.s[self.current++];
 }
 
@@ -83,7 +80,7 @@ fn bool is_unquoted_key(char c)
 	return (c.is_alpha() || c.is_digit() || c == '-' || c == '_');
 }
 
-fn void! Parser.skip_ws(&self)
+fn void? Parser.skip_ws(&self)
 {
 	while (is_ws(self.peek())) self.advance()!;
 
@@ -94,14 +91,14 @@ fn void! Parser.skip_ws(&self)
 // comment-start-symboel = #
 // non-eol =  0x09 / 0x20 - 0x7f / non-ascii
 // non-ascii = 0x80 - D7FF/ 0xE000 - 10FFFF
-fn void! Parser.skip_comment(&self)
+fn void? Parser.skip_comment(&self)
 {
 	if (!self.must('#')) return;
 	while (non_eol(self.peek())) self.advance()!;
 }
 
 // sw-comment-newline = *( wschar / [comment ] newline )
-fn void! Parser.skip_ws_comment_newline(&self)
+fn void? Parser.skip_ws_comment_newline(&self)
 {
 	while LOOP: (1)
 	{
@@ -134,7 +131,7 @@ fn bool Parser.must(&self, char c)
 	return true;
 }
 
-fn bool! Parser.match(&self, String str)
+fn bool? Parser.match(&self, String str)
 {
 	int backup = self.current;
 
@@ -145,13 +142,12 @@ fn bool! Parser.match(&self, String str)
 			self.current = backup;
 			return false;
 		}
-		
 	}
 
 	return true;
 }
 
-fn Object*! Parser.boolean(&self)
+fn Object*? Parser.boolean(&self)
 {
 	bool value;
 
@@ -166,7 +162,7 @@ fn Object*! Parser.boolean(&self)
 	else
 	{
 		self.error("could not parse boolean; did you misspell 'true' or 'false'");
-		return ParserError.INVALID_BOOLEAN?;
+		return INVALID_BOOLEAN?;
 	}
 
 	return object::new_bool(value);
@@ -177,7 +173,7 @@ fn Object*! Parser.boolean(&self)
 // inline-table-close = ws ']'
 // inline-table-sep = ws ',' ws
 // inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
-fn Object*! Parser.inline_table(&self)
+fn Object*? Parser.inline_table(&self)
 {
 	self.must('{');
 
@@ -196,13 +192,13 @@ fn Object*! Parser.inline_table(&self)
 	if (!self.must('}'))
 	{
 		self.error("expected '}'");
-		return ParserError.UNCLOSED_INLINE_TABLE?;
+		return UNCLOSED_INLINE_TABLE?;
 	}
 
 	return table;
 }
 
-fn Object*! Parser.value(&self)
+fn Object*? Parser.value(&self)
 {
 	switch (self.peek())
 	{
@@ -229,7 +225,7 @@ fn Object*! Parser.value(&self)
 // dotted-key = simple-key 1*( dot-sep simple-key )
 //
 // Returns true when keys were parsed.
-fn bool! Parser.key(&self, StringList *list)
+fn bool? Parser.key(&self, StringList *list)
 {
 	while (1)
 	{
@@ -263,24 +259,24 @@ fn bool! Parser.key(&self, StringList *list)
 	}
 }
 
-fn void! Parser.insert(&self, Object *table, StringList k, Object* v)
+fn void? Parser.insert(&self, Object *table, StringList k, Object* v)
 {
 	String key = k.pop()!;
 	Object* target = self.get_table(k, table)!;
 	if (target.has_key(key))
 	{
 		self.error("key is already used; duplicated keys are not supported.");
-		return ParserError.DUPLICATED_KEY?;
+		return DUPLICATED_KEY?;
 	}
 	target.set(key, v);
 }
 
 // keyval = key keyval-sep val
 // keyval-sep = ws '=' ws
-fn void! Parser.keyval(&self, Object *obj)
+fn void? Parser.keyval(&self, Object *obj)
 {
 	StringList key;
-	key.new_init(4, self.allocator);
+	key.init(self.allocator, 4);
 	defer key.free();
 
 	// parse key
@@ -291,7 +287,7 @@ fn void! Parser.keyval(&self, Object *obj)
 	if (!self.must('='))
 	{
 		self.error("expected '='");
-		return ParserError.MISSING_KEYVAL_SEPARATOR?;
+		return MISSING_KEYVAL_SEPARATOR?;
 	}
 	self.skip_ws()!;
 
@@ -301,7 +297,7 @@ fn void! Parser.keyval(&self, Object *obj)
 	self.insert(obj, key, val)!;
 }
 
-fn Object*! Parser.get_table(&self, StringList tables, Object *cur, bool create_as_array = false)
+fn Object*? Parser.get_table(&self, StringList tables, Object *cur, bool create_as_array = false)
 {
 	foreach(table : tables) cur = cur.get_or_create_obj(table);
 	if (create_as_array) {
@@ -310,7 +306,7 @@ fn Object*! Parser.get_table(&self, StringList tables, Object *cur, bool create_
 	if (cur.is_array()) {
 		return cur.get_at(cur.get_len()-1);
 	}
-	
+
 	return cur;
 }
 
@@ -325,7 +321,7 @@ fn Object*! Parser.get_table(&self, StringList tables, Object *cur, bool create_
 //
 // array-table-open = '[[' ws
 // array-table-close = ws ']]' ws
-fn Object*! Parser.table(&self, Object *obj)
+fn Object*? Parser.table(&self, Object *obj)
 {
 	self.must('[');
 
@@ -334,13 +330,13 @@ fn Object*! Parser.table(&self, Object *obj)
 	self.skip_ws()!;
 
 	StringList key;
-	key.new_init(4, self.allocator);
+	key.init(self.allocator, 4);
 	defer key.free();
 
 	if (!self.key(&key)!)
 	{
 		self.error("you must specify a table name between [ and ]");
-		return ParserError.MISSING_TABLE_NAME?;
+		return MISSING_TABLE_NAME?;
 	}
 
 	Object *cur = self.get_table(key, obj, create_as_array)!;
@@ -350,12 +346,12 @@ fn Object*! Parser.table(&self, Object *obj)
 	if (!self.must(']')) {
 		io::printfn("line %d: expected ']' but got %c", self.line, self.peek());
 		self.error("expected ']'; did you forget to add the closing bracket ']'?");
-		return ParserError.UNCLOSED_STD_TABLE?;
+		return UNCLOSED_STD_TABLE?;
 	}
 
 	if (create_as_array && !self.must(']')) {
 		self.error("expected ']]'; did you forget to add an additonal ']'?");
-		return ParserError.UNCLOSED_ARRAY_TABLE?;
+		return UNCLOSED_ARRAY_TABLE?;
 	}
 
 	return cur;
@@ -364,7 +360,7 @@ fn Object*! Parser.table(&self, Object *obj)
 // expression =  ws [ comment ]
 // expression =/ ws keyval ws [ comment ]
 // expression =/ ws table ws [ comment ]
-fn void! Parser.expression(&self, Object *obj)
+fn void? Parser.expression(&self, Object *obj)
 {
 	self.skip_ws()!;
 	self.skip_comment()!;
@@ -385,21 +381,21 @@ fn void! Parser.expression(&self, Object *obj)
 // toml = expression *( newline expression )
 // newline =  0x0A
 // newline =/ 0x0D.0x0A
-fn Object*! Parser.toml(&self)
+fn Object*? Parser.toml(&self)
 {
 	Object* obj = object::new_obj(self.allocator);
 	self.current_table = obj;
 
-	anyfault last_error;
+	fault last_error;
 	int max_lines = int.max;
 	while LOOP: (max_lines--) {
 		if (catch err = self.expression(obj))
 		{
-			if (err == IoError.EOF) break LOOP;
+			if (err == io::EOF) break LOOP;
 
 			if (last_error)
 			{
-				last_error = ParserError.MULTIPLE_ERRORS;
+				last_error = MULTIPLE_ERRORS;
 			} else {
 				last_error = err;
 			}

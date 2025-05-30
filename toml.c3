@@ -8,7 +8,7 @@ struct Config (Printable)
 	Object* table;
 }
 
-fn usz! Config.to_format(&self, Formatter* formatter) @dynamic
+fn usz? Config.to_format(&self, Formatter* formatter) @dynamic
 {
 	Object *obj = self.table;
 	if (obj == null) {
@@ -17,9 +17,9 @@ fn usz! Config.to_format(&self, Formatter* formatter) @dynamic
 	return obj.to_format(formatter);
 }
 
-fn Object*! Config.get(&self, String dotted_keys)
+fn Object*? Config.get(&self, String dotted_keys)
 {
-	String[] keys = dotted_keys.split(".", 0, allocator::temp());
+	String[] keys = dotted_keys.tsplit(".", 0);
 	Object* value = self.table;
 	foreach (key : keys)
 	{
@@ -36,26 +36,26 @@ fn void Config.free(&self)
 	}
 }
 
-fn Config! from_file(String filename, Allocator allocator = allocator::heap())
+fn Config? from_file(String filename, Allocator allocator = allocator::heap())
 {
 	File f = file::open(filename, "r")!;
 	defer (void)f.close();
-	Config! cfg = from_stream(&f, allocator)!;
+	Config? cfg = from_stream(&f, allocator)!;
 	return cfg;
 }
 
-fn Config! from_stream(InStream reader, Allocator allocator = allocator::heap())
+fn Config? from_stream(InStream reader, Allocator allocator = allocator::heap())
 {
 	ByteWriter writer;
-	io::copy_to(reader, writer.temp_init())!;
-	return Config{toml::parser::Parser{}.init(writer.str_view(), allocator).toml()!};
+	io::copy_to(reader, writer.tinit())!;
+	return (Config){(toml::parser::Parser){}.init(writer.str_view(), allocator).toml()!};
 }
 
-fn Config! from_string(String s, Allocator allocator = allocator::heap())
+fn Config? from_string(String s, Allocator allocator = allocator::heap())
 {
-	return Config{toml::parser::Parser{}.init(s, allocator).toml()!};
+	return (Config){(toml::parser::Parser){}.init(s, allocator).toml()!};
 }
 
-macro void! Config.unmarshal(&self, t) => unmarshal_obj(t, self.table);
+macro void? Config.unmarshal(&self, t) => unmarshal_obj(t, self.table);
 
 

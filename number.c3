@@ -44,11 +44,11 @@ struct Token
 	DString s;
 }
 
-fn Object*! Parser.number_or_datetime(&self)
+fn Object*? Parser.number_or_datetime(&self)
 {
 	Token tok;
 
-	tok.s.new_init(16, self.allocator);
+	tok.s.init(self.allocator, 16);
 	defer tok.s.free();
 
 	self.integer(&tok)!;
@@ -64,11 +64,11 @@ fn Object*! Parser.number_or_datetime(&self)
 			return object::new_string(str, self.allocator);
 		default:
 			self.error("invalid token type in parsing a number of a datetime.");
-			return ParserError.INVALID_TOKEN_TYPE?;
+			return parser::INVALID_TOKEN_TYPE?;
 	}
 }
 
-fn void! Parser.integer(&self, Token *tok)
+fn void? Parser.integer(&self, Token *tok)
 {
 	tok.type = TokenType.INTEGER;
 	switch (self.peek())
@@ -130,7 +130,7 @@ fn void! Parser.integer(&self, Token *tok)
 //
 // special-float = [ minus / plus ] ( inf / nan )
 //
-fn void! Parser.parse_float(&self, Token *tok)
+fn void? Parser.parse_float(&self, Token *tok)
 {
 	tok.type = FLOAT;
 
@@ -157,7 +157,7 @@ fn void! Parser.parse_float(&self, Token *tok)
 	self.parse_float(tok)!;
 }
 
-fn void! Parser.date_time(&self, Token *tok)
+fn void? Parser.date_time(&self, Token *tok)
 {
 	tok.type = DATETIME;
 	switch (self.peek())
@@ -175,9 +175,9 @@ fn void! Parser.date_time(&self, Token *tok)
 	}
 }
 
-def Accept = fn bool(char);
+alias Accept = fn bool(char);
 
-fn void! Parser.parse_int(&self, DString s, Accept accept)
+fn void? Parser.parse_int(&self, DString s, Accept accept)
 {
 	char c;
 	while LOOP: (1)
@@ -185,7 +185,7 @@ fn void! Parser.parse_int(&self, DString s, Accept accept)
 		c = self.peek();
 		switch
 		{
-			case accept(c): 
+			case accept(c):
 				s.append_char(self.advance()!);
 			case c == '_':
 				self.advance()!;
@@ -195,7 +195,7 @@ fn void! Parser.parse_int(&self, DString s, Accept accept)
 	}
 }
 
-fn void! Parser.hex_int(&self, DString s) => self.parse_int(s, &ascii::is_xdigit)!;
-fn void! Parser.oct_int(&self, DString s) => self.parse_int(s, &ascii::is_odigit)!;
-fn void! Parser.bin_int(&self, DString s) => self.parse_int(s, &ascii::is_bdigit)!;
+fn void? Parser.hex_int(&self, DString s) => self.parse_int(s, &ascii::is_xdigit)!;
+fn void? Parser.oct_int(&self, DString s) => self.parse_int(s, &ascii::is_odigit)!;
+fn void? Parser.bin_int(&self, DString s) => self.parse_int(s, &ascii::is_bdigit)!;
 

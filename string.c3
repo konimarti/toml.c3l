@@ -1,4 +1,4 @@
-module toml::parser; 
+module toml::parser;
 
 import std::io;
 import std::collections::object;
@@ -36,7 +36,7 @@ fn bool literal_char(char c) @inline
 
 
 // string = ml-basic-string / basic-string / ml-literal-string / literal-string
-fn Object*! Parser.string(&self)
+fn Object*? Parser.string(&self)
 {
 	self.start = self.current;
 
@@ -60,11 +60,11 @@ fn Object*! Parser.string(&self)
 		else
 		{
 			self.error("invalid quote; only use \" and '");
-			return ParserError.INVALID_QUOTE?;
+			return parser::INVALID_QUOTE?;
 		}
 
 	}
-	else 
+	else
 	{
 		// handle single-quoted string "abc"
 		// first quote was already consumed.
@@ -81,7 +81,7 @@ fn Object*! Parser.string(&self)
 		else
 		{
 			self.error("invalid quote; only use \" and '");
-			return ParserError.INVALID_QUOTE?;
+			return parser::INVALID_QUOTE?;
 		}
 
 		return object::new_string(self.text()[1..^2], self.allocator);
@@ -93,12 +93,12 @@ fn Object*! Parser.string(&self)
 // ml-basic-string-delim = 3quotation-mark
 // ml-basic-body = *mlb-content *( mlb-quotes 1*mlb-content ) [ mlb-quotes ]
 // mlb-quotes = 1*2quotation-mark
-fn Object*! Parser.ml_basic_string(&self)
+fn Object*? Parser.ml_basic_string(&self)
 {
 	// ml-basic-string-delim has been read at this point.
 
 	DString d;
-	d.new_init(16, self.allocator);
+	d.init(self.allocator, 16);
 	defer d.free();
 
 	// [ newline ]
@@ -117,7 +117,7 @@ fn Object*! Parser.ml_basic_string(&self)
 			i++;
 			d.append_char('"');
 		}
-		switch 
+		switch
 		{
 			case i < 3:
 				continue;
@@ -125,7 +125,7 @@ fn Object*! Parser.ml_basic_string(&self)
 				break LOOP;
 			case i >= 6:
 				self.error("terminal quote sequence is invalid; there are too many..");
-				return ParserError.INVALID_TERMINAL_QUOTES?;
+				return parser::INVALID_TERMINAL_QUOTES?;
 		}
 	}
 
@@ -133,18 +133,18 @@ fn Object*! Parser.ml_basic_string(&self)
 	if (d.len() <= 3)
 	{
 		self.error("multi-line string is not long enough; did add three quotes on both sides?");
-		return ParserError.MULTILINE_STRING_TOO_SHORT?;
+		return parser::MULTILINE_STRING_TOO_SHORT?;
 	}
 
 	return object::new_string(d.str_view().strip_end(`"""`), self.allocator);
 }
 
 // mlb-content = mlb-char / newline / mlb-escaped-nl
-// mlb-char = mlb-unescaped / escaped 
+// mlb-char = mlb-unescaped / escaped
 // mlb-unescaped = wschar / 0x21 / 0x23 - 0x5B / 0x5D - 0x7E / non-ascii
 // mlb-escaped-nl = escape ws newline *( wschar / newline )
 // TODO: non-ascii
-fn void! Parser.mlb_content(&self, DString *d)
+fn void? Parser.mlb_content(&self, DString *d)
 {
 	// mlb-content = mlb-char / newline / mlb-escaped-nl
 	char c;
@@ -152,7 +152,7 @@ fn void! Parser.mlb_content(&self, DString *d)
 	{
 		c = self.peek();
 
-		// mlb-char = escaped 
+		// mlb-char = escaped
 		if (is_ws(c) || c == 0x21 || (c >= 0x23 && c <= 0x5B) || (c >= 0x5D && c <= 0x7E)) {
 			d.append_char(self.advance()!);
 			continue;
@@ -164,7 +164,7 @@ fn void! Parser.mlb_content(&self, DString *d)
 			continue;
 		}
 
-		// mlb-char = escaped 
+		// mlb-char = escaped
 		// mlb-escaped-nl = escape ws newline *( wschar / newline )
 		if (self.must(ESCAPE))
 		{
@@ -192,7 +192,7 @@ fn void! Parser.mlb_content(&self, DString *d)
 					else
 					{
 						self.error("invalid escaped unicode sequence");
-						return ParserError.INVALID_ESCAPE_UNICODE?;
+						return parser::INVALID_ESCAPE_UNICODE?;
 					}
 				}
 
@@ -205,7 +205,7 @@ fn void! Parser.mlb_content(&self, DString *d)
 				while (is_ws(self.peek()) || is_newline(self.peek())) self.advance()!;
 			}
 		}
-		
+
 		break LOOP;
 	}
 }
@@ -218,7 +218,7 @@ fn void! Parser.mlb_content(&self, DString *d)
 // escape = 0x5C ; \
 // escape-seq-char = 0x22 / 0x5C / 0x62 / 0x66 / 0x6E / 0x72 / 0x72 / unicode??
 // TODO: non-ascii
-fn void! Parser.basic_string(&self)
+fn void? Parser.basic_string(&self)
 {
 	// beginning quote is already consumed.
 
@@ -227,7 +227,7 @@ fn void! Parser.basic_string(&self)
 		// basic-unescaped
 		if (basic_unescaped(self.peek()))
 		{
-			self.advance()!;	
+			self.advance()!;
 			continue;
 		}
 
@@ -256,7 +256,7 @@ fn void! Parser.basic_string(&self)
 					else
 					{
 						self.error("invalid escaped unicode sequence");
-						return ParserError.INVALID_ESCAPE_UNICODE?;
+						return parser::INVALID_ESCAPE_UNICODE?;
 					}
 				}
 
@@ -265,14 +265,14 @@ fn void! Parser.basic_string(&self)
 			else
 			{
 				self.error("invalid escape sequence");
-				return ParserError.INVALID_ESCAPE_SEQUENCE?;
+				return parser::INVALID_ESCAPE_SEQUENCE?;
 			}
 		}
 
-		if (!self.must('"')) 
+		if (!self.must('"'))
 		{
 			self.error("missing closing quote \"");
-			return ParserError.UNCLOSED_QUOTE?;
+			return parser::UNCLOSED_QUOTE?;
 		}
 
 		break LOOP;
@@ -283,12 +283,12 @@ fn void! Parser.basic_string(&self)
 //			ml-literal-string-delim
 // ml-literal-string-delim = 3apostrophe
 // ml-literal-body = "mll-content *( mll-quotes 1*mll-content ) [ mll-quotes ]
-fn Object*! Parser.ml_literal_string(&self)
+fn Object*? Parser.ml_literal_string(&self)
 {
 	// ml-literal-string-delim has been read at this point.
 
 	DString d;
-	d.new_init(16, self.allocator);
+	d.init(self.allocator, 16);
 	defer d.free();
 
 	// [ newline ]
@@ -307,7 +307,7 @@ fn Object*! Parser.ml_literal_string(&self)
 			i++;
 			d.append_char('\'');
 		}
-		switch 
+		switch
 		{
 			case i < 3:
 				continue;
@@ -315,7 +315,7 @@ fn Object*! Parser.ml_literal_string(&self)
 				break LOOP;
 			case i >= 6:
 				self.error("terminal apostrophe sequence is invalid; there are too many..");
-				return ParserError.INVALID_TERMINAL_QUOTES?;
+				return parser::INVALID_TERMINAL_QUOTES?;
 		}
 	}
 
@@ -323,7 +323,7 @@ fn Object*! Parser.ml_literal_string(&self)
 	if (d.len() <= 3)
 	{
 		self.error("multi-line string is not long enough; did add three apostrophes on both sides?");
-		return ParserError.MULTILINE_STRING_TOO_SHORT?;
+		return parser::MULTILINE_STRING_TOO_SHORT?;
 	}
 
 	return object::new_string(d.str_view().strip_end(`'''`), self.allocator);
@@ -333,7 +333,7 @@ fn Object*! Parser.ml_literal_string(&self)
 // mll-char = 0x09 / 0x20 - 0x26 / 0x28 - 0x7E / non-ascci
 // mll-quotes = 1*2apstrophe
 // TODO: non-ascii
-fn void! Parser.mll_content(&self, DString *d)
+fn void? Parser.mll_content(&self, DString *d)
 {
 	// mll-content = mll-char / newline
 	char c;
@@ -360,7 +360,7 @@ fn void! Parser.mll_content(&self, DString *d)
 // literal-string = apostrophe *literal-char apostrophe
 // literal-char = 0x09 / 0x20 - 0x26 / 0x28 - 0x7E / non-ascii
 // TODO: non-ascii
-fn void! Parser.literal_string(&self)
+fn void? Parser.literal_string(&self)
 {
 	// beginning apostrophe is already consumed.
 
@@ -368,14 +368,14 @@ fn void! Parser.literal_string(&self)
 	{
 		if (!literal_char(self.peek()))
 		{
-			if (!self.must('\'')) 
+			if (!self.must('\''))
 			{
 				self.error("missing closing apostrophe '");
-				return ParserError.UNCLOSED_QUOTE?;
+				return parser::UNCLOSED_QUOTE?;
 			}
 			return;
 		}
-		self.advance()!;	
+		self.advance()!;
 	}
 }
 

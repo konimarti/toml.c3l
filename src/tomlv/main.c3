@@ -14,7 +14,7 @@ options:
 `;
 
 fn void main(String[] args)
-{	
+{
 	bool verbose;
 	foreach (arg : args)
 	{
@@ -28,7 +28,7 @@ fn void main(String[] args)
 		}
 	}
 
-	Config! c = toml::from_stream(io::stdin());
+	Config? c = toml::from_stream(io::stdin());
 	if (catch err = c)
 	{
 		io::eprintfn("  Invalid TOML: %s", err);

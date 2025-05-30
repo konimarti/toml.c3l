@@ -30,9 +30,9 @@ import std::time::datetime;
 
 // 1996-12-19T16:39:57-08:00
 
-fn DateTime! parse(String s)
+fn DateTime? parse(String s)
 {
-	return Parser{s}.parse();
+	return (Parser){s}.parse();
 }
 
 
@@ -40,12 +40,9 @@ module toml::rfc3339::parser @private;
 
 import std::time::datetime;
 
-fault Error
-{
-	INVALID_DATE_FORMAT,
+faultdef INVALID_DATE_FORMAT,
 	INVALID_INPUT,
-	INVALID_NUMBER,
-}
+	INVALID_NUMBER;
 
 struct Date
 {
@@ -54,9 +51,9 @@ struct Date
 	int day;
 }
 
-fn void! Date.parse(&d, Parser* p)
+fn void? Date.parse(&d, Parser* p)
 {
-	if (p.s.len < 10) return Error.INVALID_INPUT?;
+	if (p.s.len < 10) return INVALID_INPUT?;
 
 	d.year = p.consumeInt()!;
 	p.consume('-')!;
@@ -74,9 +71,9 @@ struct Time
 	bool utc;
 }
 
-fn void! Time.parse(&t, Parser* p)
+fn void? Time.parse(&t, Parser* p)
 {
-	if (p.s.len < 8) return Error.INVALID_INPUT?;
+	if (p.s.len < 8) return INVALID_INPUT?;
 
 	t.hour = p.consumeInt()!;
 	p.consume(':')!;
@@ -99,9 +96,9 @@ struct Offset
 	int min;
 }
 
-fn void! Offset.parse(&o, Parser* p)
+fn void? Offset.parse(&o, Parser* p)
 {
-	if (p.s.len < 6) return Error.INVALID_INPUT?;
+	if (p.s.len < 6) return INVALID_INPUT?;
 
 	int sign;
 	switch (p.peek())
@@ -127,18 +124,14 @@ fn int Offset.to_sec(&o)
 }
 
 
-fault ParserError
-{
-	INVALID_LENGTH,
-	UNEXPECTED_CHAR,
-}
+faultdef INVALID_LENGTH, UNEXPECTED_CHAR;
 
 struct Parser
 {
 	String s;
 }
 
-fn DateTime! Parser.parse(&p)
+fn DateTime? Parser.parse(&p)
 {
 	Date d;
 	d.parse(p)!;
@@ -172,18 +165,18 @@ fn char Parser.peek(&p)
 	return p.s[0];
 }
 
-fn void! Parser.consume(&p, char c)
+fn void? Parser.consume(&p, char c)
 {
-	if (p.empty() || p.peek() != c) return ParserError.UNEXPECTED_CHAR?;
+	if (p.empty() || p.peek() != c) return UNEXPECTED_CHAR?;
 	p.s = p.s[1..];
 }
 
-fn int! Parser.consumeInt(&p)
+fn int? Parser.consumeInt(&p)
 {
 	int n, v;
 	while (n < p.s.len && p.s[n].is_digit()) n++;
 
-	if (!n) return ParserError.INVALID_LENGTH?;
+	if (!n) return INVALID_LENGTH?;
 
 	v = p.s[:n].to_int()!;
 	p.s = p.s[n..];

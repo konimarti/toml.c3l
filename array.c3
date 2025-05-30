@@ -9,7 +9,7 @@ import std::collections::object @public;
 // array-values = ws-comment-newline val ws-comment newline array-sep array-values
 // array-values = ws-comment-newline val ws-comment-newline [ array-sep ]
 // array-sep = 0x2C ; ,
-fn Object*! Parser.array(&self)
+fn Object*? Parser.array(&self)
 {
 	// array-open
 	self.must('[');

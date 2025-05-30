@@ -34,7 +34,7 @@ const TOML_DOC = `
 
 fn void test_parser_toml_doc() @test
 {
-	toml::parser::Parser scan;	
+	toml::parser::Parser scan;
 	scan.init(TOML_DOC, allocator::temp());
 	Object* obj = scan.toml()!!;
 	//io::printn(obj);
@@ -60,7 +60,7 @@ fn void test_parser_toml_doc() @test
 	assert(ports.get_int_at(1)!! == 8001);
 	assert(ports.get_int_at(2)!! == 8002);
 
-	assert(@catch(database.get("data")) == SearchResult.MISSING);
+	assert(@catch(database.get("data")) == NOT_FOUND);
 
 	assert(math::abs(temp.get_float("cpu")!! - 79.5) < math::FLOAT_EPSILON);
 	assert(math::abs(temp.get_float("case")!! - 72.0) < math::FLOAT_EPSILON);
@@ -322,7 +322,7 @@ fn void parser_value_float() @test
 			assert(math::is_nan(value),
 				"test %d [%s]: value is not a nan", i+1, t.name);
 		}
-		else 
+		else
 		{
 			assert(equals(value, t.want),
 				"test %d [%s]: got: %g, but want: %g", i+1, t.name, value, t.want);

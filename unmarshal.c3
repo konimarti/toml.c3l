@@ -4,16 +4,13 @@ import std::io;
 import std::collections::map;
 import std::collections::object;
 
-fault MarshalError
-{
-	UNSUPPORTED_TYPE,
-}
+faultdef UNSUPPORTED_TYPE;
 
-macro void! unmarshal_obj(t, m)
+macro void? unmarshal_obj(t, m)
 {
 	var $Type = $typeof(*t);
 
-	$foreach ($x : $Type.membersof)
+	$foreach $x : $Type.membersof:
 
 		// io::printn("-------");
 		// io::printfn("nameof: %s", $x.nameof);
@@ -24,7 +21,7 @@ macro void! unmarshal_obj(t, m)
 		if (m.has_key($x.nameof))
 		{
 
-		$switch ($x.kindof)
+		$switch $x.kindof:
 
 		$case TypeKind.STRUCT:
 
@@ -37,7 +34,7 @@ macro void! unmarshal_obj(t, m)
 			if (!arr.is_array())
 			{
 				io::eprintfn("TOML Unmarshal Error: should field '%s' really be an array?", $x.nameof);
-				return MarshalError.UNSUPPORTED_TYPE?;
+				return UNSUPPORTED_TYPE?;
 			}
 
 			var $ElementType = $typefrom($x.typeid.inner);
@@ -60,7 +57,7 @@ macro void! unmarshal_obj(t, m)
 				}
 			$else
 				io::eprintfn("TOML Unmarshal Error: type of field '%s' is unsupported; use 'Object*' instead.", $x.nameof);
-				return MarshalError.UNSUPPORTED_TYPE?;
+				return UNSUPPORTED_TYPE?;
 			$endif
 
 		$default:
@@ -68,7 +65,7 @@ macro void! unmarshal_obj(t, m)
 			var $TargetType = $typefrom($x.typeid);
 			String $name = $x.nameof;
 
-			$switch
+			$switch:
 
 				$case types::is_int($TargetType):
 
