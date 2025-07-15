@@ -28,13 +28,13 @@ fn void main(String[] args)
 		}
 	}
 
-	Config? c = toml::from_stream(io::stdin());
-	if (catch err = c)
+	TomlData? td = toml::from_stream(io::stdin());
+	if (catch err = td)
 	{
 		io::eprintfn("  Invalid TOML: %s", err);
 		return;
 	}
 	io::eprintn("\n  TOML file is valid.\n");
-	if (verbose) io::printn(c);
-	c.free();
+	if (verbose) io::printn(td);
+	td.free();
 }

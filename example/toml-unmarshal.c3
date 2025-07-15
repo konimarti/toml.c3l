@@ -23,7 +23,7 @@ struct TomlConfig
 }
 
 fn void main()
-{	
+{
 	String s = `
 	title = "TOML example"
 
@@ -36,11 +36,11 @@ fn void main()
 	ports =[ 1, "hello", 3, 4]
 	`;
 
-	Config c = toml::from_string(s)!!;
-	defer c.free();
+	TomlData td = toml::from_string(s)!!;
+	defer td.free();
 
-	TomlConfig t;
-	c.unmarshal(&t)!!;
-	
-	io::printn(t);
+	TomlConfig config;
+	td.unmarshal(&config)!!;
+
+	io::printn(config);
 }

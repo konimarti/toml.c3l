@@ -16,23 +16,23 @@ or directly from a file name.
 
 Read data from `String s`:
 ```
-Config c = toml::from_string(s)!;
-defer c.free();
+TomlData td = toml::from_string(s)!;
+defer td.free();
 ```
 
 Read data from `InStream in`:
 ```
-Config c = toml::from_stream(in)!;
-defer c.free();
+TomlData td = toml::from_stream(in)!;
+defer td.free();
 ```
 
 Read data directly from a file name:
 ```
-Config c = toml::from_file("test.toml")!;
-defer c.free();
+TomlData td = toml::from_file("test.toml")!;
+defer td.free();
 ```
 
-To obtain a config value from the TOML tables, use the `Config.get` funtion and
+To obtain a config value from the TOML tables, use the `TomlData.get` funtion and
 provide the table and value names in a dotted-key notation.
 
 For example, the `color` value from the TOML config
@@ -40,7 +40,7 @@ For example, the `color` value from the TOML config
 [fruit]
 color = 0x3AA832
 ```
-can be obtained with `c.get("fruit.color")`. The return value of `Config.get`
+can be obtained with `td.get("fruit.color")`. The return value of `TomlData.get`
 is a `std::collections::Object`.
 
 
@@ -80,11 +80,11 @@ fn void main()
 	[database]
 	ports = [8000, 8001, 8002]`;
 
-	Config c = toml::from_string(s)!!;
-	defer c.free();
+	TomlData td = toml::from_string(s)!!;
+	defer td.free();
 
-	io::printfn("title: %s", c.get("title")!!);
-	io::printfn("ports: %s", c.get("database.ports")!!);
+	io::printfn("title: %s", td.get("title")!!);
+	io::printfn("ports: %s", td.get("database.ports")!!);
 }
 // Output:
 // title: "TOML example"
@@ -127,13 +127,13 @@ fn void main()
 	items = 4
 	fresh = true`;
 
-	Config c = toml::from_string(s)!!;
-	defer c.free();
+	TomlData td = toml::from_string(s)!!;
+	defer td.free();
 
-	TomlConfig t;
-	c.unmarshal(&t)!!;
+	TomlConfig config;
+	td.unmarshal(&config)!!;
 	
-	io::printn(t);
+	io::printn(config);
 }
 // Output:
 // { title: TOML example, fruit: { name: apple, color: 48879, price: 1.320000, items: 4, fresh: true } }

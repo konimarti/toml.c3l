@@ -3,12 +3,12 @@ module toml;
 import std::io;
 import std::collections::object;
 
-struct Config (Printable)
+struct TomlData (Printable)
 {
 	Object* table;
 }
 
-fn usz? Config.to_format(&self, Formatter* formatter) @dynamic
+fn usz? TomlData.to_format(&self, Formatter* formatter) @dynamic
 {
 	Object *obj = self.table;
 	if (obj == null) {
@@ -17,7 +17,7 @@ fn usz? Config.to_format(&self, Formatter* formatter) @dynamic
 	return obj.to_format(formatter);
 }
 
-fn Object*? Config.get(&self, String dotted_keys)
+fn Object*? TomlData.get(&self, String dotted_keys)
 {
 	String[] keys = dotted_keys.tsplit(".", 0);
 	Object* value = self.table;
@@ -28,7 +28,7 @@ fn Object*? Config.get(&self, String dotted_keys)
 	return value;
 }
 
-fn void Config.free(&self)
+fn void TomlData.free(&self)
 {
 	if (self.table)
 	{
@@ -36,26 +36,24 @@ fn void Config.free(&self)
 	}
 }
 
-fn Config? from_file(String filename, Allocator allocator = allocator::heap())
+fn TomlData? from_file(String filename, Allocator allocator = allocator::heap())
 {
 	File f = file::open(filename, "r")!;
 	defer (void)f.close();
-	Config? cfg = from_stream(&f, allocator)!;
+	TomlData? cfg = from_stream(&f, allocator)!;
 	return cfg;
 }
 
-fn Config? from_stream(InStream reader, Allocator allocator = allocator::heap())
+fn TomlData? from_stream(InStream reader, Allocator allocator = allocator::heap())
 {
 	ByteWriter writer;
 	io::copy_to(reader, writer.tinit())!;
-	return (Config){(toml::parser::Parser){}.init(writer.str_view(), allocator).toml()!};
+	return (TomlData){(toml::parser::Parser){}.init(writer.str_view(), allocator).toml()!};
 }
 
-fn Config? from_string(String s, Allocator allocator = allocator::heap())
+fn TomlData? from_string(String s, Allocator allocator = allocator::heap())
 {
-	return (Config){(toml::parser::Parser){}.init(s, allocator).toml()!};
+	return (TomlData){(toml::parser::Parser){}.init(s, allocator).toml()!};
 }
 
-macro void? Config.unmarshal(&self, t) => unmarshal_obj(t, self.table);
-
-
+macro void? TomlData.unmarshal(&self, t) => unmarshal_obj(t, self.table);
