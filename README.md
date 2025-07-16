@@ -43,6 +43,20 @@ color = 0x3AA832
 can be obtained with `td.get("fruit.color")`. The return value of `TomlData.get`
 is a `std::collections::Object`.
 
+### Unmarshal TOML into struct
+
+The parsed TOML data can also be unmarshalled into a custom struct with the
+`TomlData.unmarshal` macro:
+
+```cpp
+TomlData td = toml::from_string(s)!!;
+defer td.free();
+
+MyConfig config;
+td.unmarshal(&config)!!;
+```
+
+For a more detailed example, see below.
 
 ### Installation
 
