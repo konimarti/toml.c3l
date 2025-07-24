@@ -35,7 +35,7 @@ const TOML_DOC = `
 fn void test_parser_toml_doc() @test
 {
 	toml::parser::Parser scan;
-	scan.init(TOML_DOC, allocator::temp());
+	scan.init(TOML_DOC, tmem);
 	Object* obj = scan.toml()!!;
 	//io::printn(obj);
 
@@ -117,7 +117,7 @@ fn void parser_value_string() @test
 	foreach (i, t : tests)
 	{
 		toml::parser::Parser p;
-		String s = p.init(t.input, allocator::temp()).string()!!.s;
+		String s = p.init(t.input, tmem).string()!!.s;
 		assert(s == t.want,
 			"test %d [%s]: got: %s, but want: %s",
 				i+1, t.name, s, t.want);
@@ -136,7 +136,7 @@ fn void parser_array_tables() @test
 		widget.color = "blue"
 		widget.price = 2.71
 		`,
-		allocator::temp(),
+		tmem,
 	);
 
 	Object* obj = p.toml()!!;
@@ -150,7 +150,7 @@ fn void parser_inline_tables() @test
 	toml::parser::Parser p;
 	p.init(
 	`widget = { color = "green", price = 3.14, vendors = ["abc", "def"]}`,
-		allocator::temp(),
+		tmem,
 	);
 
 	Object* obj = p.toml()!!;
@@ -230,7 +230,7 @@ fn void parser_value_integer() @test
 	foreach (i, t : tests)
 	{
 		toml::parser::Parser p;
-		p.init(t.input, allocator::temp());
+		p.init(t.input, tmem);
 		Object *integer = p.number_or_datetime()!!;
 		assert(integer.is_int(),
 			"test %d [%s]: object value is not an integer",
@@ -312,7 +312,7 @@ fn void parser_value_float() @test
 	foreach (i, t : tests)
 	{
 		toml::parser::Parser p;
-		p.init(t.input, allocator::temp());
+		p.init(t.input, tmem);
 		Object *real = p.number_or_datetime()!!;
 		assert(real.is_float(),
 			"test %d [%s]: object value is not a double", i+1, t.name);

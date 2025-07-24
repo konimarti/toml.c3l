@@ -74,7 +74,7 @@ struct TomlDoc
 fn void test_unmarshal_toml_doc() @test
 {
 	toml::parser::Parser scan;	
-	scan.init(TOML_DOC, allocator::temp());
+	scan.init(TOML_DOC, tmem);
 	Object* obj = scan.toml()!!;
 
 	TomlDoc t;

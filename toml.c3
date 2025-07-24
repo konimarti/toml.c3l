@@ -36,7 +36,7 @@ fn void TomlData.free(&self)
 	}
 }
 
-fn TomlData? from_file(String filename, Allocator allocator = allocator::heap())
+fn TomlData? from_file(String filename, Allocator allocator = mem)
 {
 	File f = file::open(filename, "r")!;
 	defer (void)f.close();
@@ -44,14 +44,14 @@ fn TomlData? from_file(String filename, Allocator allocator = allocator::heap())
 	return cfg;
 }
 
-fn TomlData? from_stream(InStream reader, Allocator allocator = allocator::heap())
+fn TomlData? from_stream(InStream reader, Allocator allocator = mem)
 {
 	ByteWriter writer;
 	io::copy_to(reader, writer.tinit())!;
 	return (TomlData){(toml::parser::Parser){}.init(writer.str_view(), allocator).toml()!};
 }
 
-fn TomlData? from_string(String s, Allocator allocator = allocator::heap())
+fn TomlData? from_string(String s, Allocator allocator = mem)
 {
 	return (TomlData){(toml::parser::Parser){}.init(s, allocator).toml()!};
 }
