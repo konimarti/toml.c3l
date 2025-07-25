@@ -1,6 +1,7 @@
 module toml::time;
 
 import std::time;
+import std::io; // Debugging
 
 enum TomlDateTimeKind
 {
@@ -58,9 +59,22 @@ fn usz? TomlDataTime.to_format(&self, Formatter* f) @dynamic
 
 fn DateTime? TomlDateTime.date_time(&self)
 {
-	DateTime dt = datetime::from_date(
-		self.year, Month.from_ordinal(self.month-1), self.day,
-		self.hour, self.minute, self.second, self.nanosecond / 1000);
+	DateTime dt;
+	switch (self.kind)
+	{
+		case DATE_ONLY:
+		case LOCAL_DATE_TIME:
+		case OFFSET_DATE_TIME:
+			dt = datetime::from_date(
+				self.year, Month.from_ordinal(self.month-1), self.day,
+				self.hour, self.minute, self.second,
+				self.nanosecond / 1000);
+		case TIME_ONLY:
+			dt = datetime::from_date(
+				0, JANUARY, 1,
+				self.hour, self.minute, self.second,
+				self.nanosecond / 1000);
+	}
 
 	if (self.kind == OFFSET_DATE_TIME)
 	{
@@ -84,7 +98,7 @@ enum TokenType
 	END
 }
 
-faultdef UNKNOWN_CHAR, EXPECTED_DASH, EXPECTED_COLON, INVALID_INPUT;
+faultdef UNKNOWN_CHAR, UNEXPECTED_TOKEN;
 
 struct Token
 {
@@ -96,7 +110,6 @@ struct Lexer
 {
 	String input;
 	usz pos;
-	usz mark;
 }
 
 fn bool is_digit(char c) => c >= '0' && c <= '9';
@@ -104,17 +117,23 @@ fn bool is_digit(char c) => c >= '0' && c <= '9';
 fn Token? Lexer.read_number(&self, usz maxlen)
 {
 	usz start = self.pos;
-	while (self.pos < self.input.len && is_digit(self.input[self.pos]) && self.pos - start < maxlen) self.pos += 1;
+	while (self.pos < self.input.len &&
+		is_digit(self.input[self.pos]) &&
+		self.pos - start < maxlen)
+	{
+		self.pos += 1;
+	}
 	int number = self.input[start .. self.pos - 1].to_int()!;
+	io::printfn("num: %d", number);
 	return { NUMBER, number };
 }
 
 fn Token? Lexer.next(&self)
 {
-	self.mark = self.pos;
+	if (self.pos >= self.input.len) return { .type = END };
+
 	char c = self.input[self.pos];
 	if (c == 0) return { .type = END };
-
 	switch (c)
 	{
 		case ':': self.pos += 1; return { .type = COLON };
@@ -125,52 +144,42 @@ fn Token? Lexer.next(&self)
 		case '-': self.pos += 1; return { .type = MINUS };
 		case ' ': self.pos += 1; return { .type = SPACE };
 		default:
-			if (is_digit(c))
-			{
-				return self.read_number(9)!;
-			}
+			if (is_digit(c)) return self.read_number(9)!;
 			return UNKNOWN_CHAR?;
 	}
 }
 
-fn Token? Lexer.peek(&self)
+fn void? Lexer.expect(&self, TokenType type, int *arg = null)
 {
-	usz save = self.pos;
 	Token tok = self.next()!;
-	self.pos = save;
-	return tok;
+	if (tok.type != type) return UNEXPECTED_TOKEN?;
+	if (arg) *arg = tok.num;
 }
 
 fn void? parse_time(Lexer *lexer, TomlDateTime *dt)
 {
-	Token tok;
+	lexer.expect(NUMBER, &dt.hour)!;
+	lexer.expect(COLON)!;
+	lexer.expect(NUMBER, &dt.minute)!;
+	lexer.expect(COLON)!;
+	lexer.expect(NUMBER, &dt.second)!;
 
-	tok = lexer.next()!;
-	if (tok.type == NUMBER) dt.hour = tok.num;
-
-	tok = lexer.next()!;
-	if (tok.type != COLON) return EXPECTED_COLON?;
-
-	tok = lexer.next()!;
-	if (tok.type == NUMBER) dt.minute = tok.num;
-
-	tok = lexer.next()!;
-	if (tok.type != COLON) return EXPECTED_COLON?;
-
-	tok = lexer.next()!;
-	if (tok.type == NUMBER) dt.second = tok.num;
-
-	tok = lexer.next()!;
+	Token tok = lexer.next()!;
 	if (tok.type == DOT)
 	{
 		usz start = lexer.pos;
-		while (is_digit(lexer.input[lexer.pos])) lexer.pos += 1;
+		int frac;
+		lexer.expect(NUMBER, &frac)!;
+		io::printfn("frac: %d", frac);
 		usz len = lexer.pos - start;
-		int frac = lexer.input[start .. lexer.pos - 1].to_int()!;
-		while (len < 9) {
-			frac *= 10; len += 1;
+		while (len < 9)
+		{
+			frac *= 10;
+			len += 1;
 		}
 		dt.nanosecond = frac;
+		io::printfn("nano: %d", frac);
+
 		tok = lexer.next()!;
 	}
 
@@ -179,54 +188,44 @@ fn void? parse_time(Lexer *lexer, TomlDateTime *dt)
 		case Z:
 			dt.kind = OFFSET_DATE_TIME;
 			dt.tz_utc = true;
-
 		case PLUS:
 		case MINUS:
-			int sign = (tok.type == MINUS) ? -1 : 1;
-
-			tok = lexer.next()!;
-			if (tok.type == NUMBER) dt.tz_hour_offset = sign * tok.num;
-
-			tok = lexer.next()!;
-			if (tok.type != COLON) return EXPECTED_COLON?;
-
-			tok = lexer.next()!;
-			if (tok.type == NUMBER) dt.tz_minute_offset = sign * tok.num;
 			dt.kind = OFFSET_DATE_TIME;
 
+			lexer.expect(NUMBER, &dt.tz_hour_offset)!;
+			lexer.expect(COLON)!;
+			lexer.expect(NUMBER, &dt.tz_minute_offset)!;
+
+			if (tok.type == MINUS)
+			{
+				dt.tz_hour_offset *= -1;
+				dt.tz_minute_offset *= -1;
+			}
 		default:
-			lexer.pos = lexer.mark; // rewind if no timezone
+			// nothing to do
 	}
 }
 
 fn DateTime? parse(String input)
 {
-	Lexer lexer = { input, 0, 0 };
+	Lexer lexer = { input, 0 };
 	TomlDateTime dt = {};
-	Token first = lexer.peek()!;
 
-	if (first.type != NUMBER) return INVALID_INPUT?; // must begin with a number
-
-	Token tok = lexer.next()!; // year/hour
-	Token sep_tok = lexer.next()!; // dash or colon
-
-	switch (sep_tok.type)
+	lexer.expect(NUMBER)!;
+	Token tok = lexer.next()!; // dash or colon
+	switch (tok.type)
 	{
 		case MINUS:
 			dt.kind = DATE_ONLY;
-			dt.year = tok.num;
+			lexer.pos = 0;
+			lexer.expect(NUMBER, &dt.year)!;
+			lexer.expect(MINUS)!;
+			lexer.expect(NUMBER, &dt.month)!;
+			lexer.expect(MINUS)!;
+			lexer.expect(NUMBER, &dt.day)!;
 
 			tok = lexer.next()!;
-			if (tok.type == NUMBER) dt.month = tok.num;
-
-			tok = lexer.next()!;
-			if (tok.type != MINUS) return EXPECTED_DASH?;
-
-			tok = lexer.next()!;
-			if (tok.type == NUMBER) dt.day = tok.num;
-
-			Token sep = lexer.next()!;
-			if (sep.type == T || sep.type == SPACE)
+			if (tok.type == T || tok.type == SPACE)
 			{
 				dt.kind = LOCAL_DATE_TIME;
 				parse_time(&lexer, &dt)!;
@@ -234,12 +233,11 @@ fn DateTime? parse(String input)
 
 		case COLON:
 			dt.kind = TIME_ONLY;
-			dt.hour = tok.num;
-			lexer.pos = lexer.mark; // rewind before colon
+			lexer.pos = 0;
 			parse_time(&lexer, &dt)!;
 
 		default:
-			return INVALID_INPUT?;
+			return UNEXPECTED_TOKEN?;
 	}
 
 	return dt.date_time();
@@ -271,7 +269,6 @@ fn void test_parse_utc() @test
 {
 	String s = "1996-12-19T16:39:57Z";
 	DateTime dt = toml::time::parse(s)!!;
-
 	assert(dt.year == 1996);
 	assert(dt.month.ordinal + 1 == 12);
 	assert(dt.day == 19);
@@ -284,5 +281,33 @@ fn void test_parse_utc_frac() @test
 {
 	String s = "1996-12-19T16:39:57.123456Z";
 	DateTime dt = toml::time::parse(s)!!;
+	assert(dt.usec == 123456, "got: %d", dt.usec);
 }
+
+fn void test_parse_date_only() @test
+{
+	String s = "1996-12-19";
+	DateTime dt = toml::time::parse(s)!!;
+	assert(dt.year == 1996);
+	assert(dt.month.ordinal + 1 == 12);
+	assert(dt.day == 19);
+	assert(dt.hour == 0);
+	assert(dt.min == 0);
+	assert(dt.sec == 0);
+}
+
+fn void test_parse_time_only() @test
+{
+	String s = "16:39:57.999999";
+	DateTime dt = toml::time::parse(s)!!;
+
+	assert(dt.year == 0);
+	assert(dt.month == JANUARY);
+	assert(dt.day == 1);
+	assert(dt.hour == 16);
+	assert(dt.min == 39);
+	assert(dt.sec == 57, "got: %d, but want: %d", dt.sec, 57);
+	assert(dt.usec == 999999);
+}
+
 
