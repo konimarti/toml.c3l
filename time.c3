@@ -10,7 +10,7 @@ enum TomlDateTimeKind
 	OFFSET_DATE_TIME,
 }
 
-struct TomlDateTime
+struct TomlDateTime (Printable)
 {
 	int year;
 	int month;
@@ -25,6 +25,37 @@ struct TomlDateTime
 	TomlDateTimeKind kind;
 }
 
+fn int TomlDataTime.offset_secs(&self) =>
+	tz_hour_offset * 3600 + tz_minute_offset * 60
+
+fn usz? TomlDataTime.to_format(&self, Formatter* f) @dynamic
+{
+	const DATE_FMT = "%d-%d-%d";
+	const TIME_FMT = "%d:%d:%d";
+	const OFF_FMT  = "%d:%d";
+	switch (self.kind)
+	{
+		case DATE_ONLY:
+			f.printf(DATE_FMT, self.year, self.month, self.day);
+		case LOCAL_DATE_TIME:
+			f.printf(DATE_FMT + " " + TIME_FMT, self.year, self.month, self.day, self.hour, self.minute, self.seconds);
+			if (self.nanosecond > 0) f.printf(".%d", self.nanosecond/1000);
+		case OFFSET_DATE_TIME:
+			f.printf(DATE_FMT + " " + TIME_FMT, self.year, self.month, self.day, self.hour, self.minute, self.seconds);
+			if (self.nanosecond > 0) f.printf(".%d", self.nanosecond/1000);
+			if (self.tz_utc) f.print("Z");
+			int off_secs = self.offset_secs();
+			if (off_secs != 0)
+			{
+				f.print(off_secs < 0 ? "-" : "+");
+				f.printf(OFF_FMT, self.tz_hour_offset, self.tz_minute_offset);
+			}
+		case TIME_ONLY:
+			f.printf("%d:%d:%d", self.hour, self.minute, self.seconds);
+			if (self.nanosecond > 0) f.printf(".%d", self.nanosecond/1000);
+	}
+}
+
 fn DateTime? TomlDateTime.date_time(&self)
 {
 	DateTime dt = datetime::from_date(
@@ -33,8 +64,7 @@ fn DateTime? TomlDateTime.date_time(&self)
 
 	if (self.kind == OFFSET_DATE_TIME)
 	{
-		TzDateTime tzdt = dt.to_gmt_offset(self.tz_hour_offset * 3600 + self.tz_minute_offset * 60);
-		dt = tzdt.date_time;
+		dt = dt.to_gmt_offset(self.offset_secs()).date_time;
 	}
 
 	return dt;
