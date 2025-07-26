@@ -1,7 +1,7 @@
 module toml::time;
 
 import std::time;
-import std::io; // Debugging
+import std::io;
 
 enum TomlDateTimeKind
 {
@@ -26,35 +26,42 @@ struct TomlDateTime (Printable)
 	TomlDateTimeKind kind;
 }
 
-fn int TomlDataTime.offset_secs(&self) =>
-	tz_hour_offset * 3600 + tz_minute_offset * 60
+fn int TomlDateTime.offset_secs(&self) => self.tz_hour_offset * 3600 + self.tz_minute_offset * 60;
 
-fn usz? TomlDataTime.to_format(&self, Formatter* f) @dynamic
+const DATE_FMT @local      = "%04d-%02d-%02d";
+const TIME_FMT @local      = "%02d:%02d:%02d";
+const OFFSET_FMT @local    = "%02d:%02d";
+const DATE_TIME_FMT @local = "%04d-%02d-%02d %02d:%02d:%02d";
+
+fn usz? TomlDateTime.to_format(&self, Formatter* f) @dynamic
 {
-	const DATE_FMT = "%d-%d-%d";
-	const TIME_FMT = "%d:%d:%d";
-	const OFF_FMT  = "%d:%d";
+	usz n;
 	switch (self.kind)
 	{
 		case DATE_ONLY:
-			f.printf(DATE_FMT, self.year, self.month, self.day);
+			n += f.printf(DATE_FMT, self.year, self.month, self.day)!;
 		case LOCAL_DATE_TIME:
-			f.printf(DATE_FMT + " " + TIME_FMT, self.year, self.month, self.day, self.hour, self.minute, self.seconds);
-			if (self.nanosecond > 0) f.printf(".%d", self.nanosecond/1000);
+			n += f.printf(DATE_TIME_FMT, self.year, self.month, self.day, self.hour, self.minute, self.second)!;
+			if (self.nanosecond > 0) n += f.printf(".%d", self.nanosecond/1000)!;
 		case OFFSET_DATE_TIME:
-			f.printf(DATE_FMT + " " + TIME_FMT, self.year, self.month, self.day, self.hour, self.minute, self.seconds);
-			if (self.nanosecond > 0) f.printf(".%d", self.nanosecond/1000);
-			if (self.tz_utc) f.print("Z");
-			int off_secs = self.offset_secs();
-			if (off_secs != 0)
+			n += f.printf(DATE_TIME_FMT, self.year, self.month, self.day, self.hour, self.minute, self.second)!;
+			if (self.nanosecond > 0) n += f.printf(".%d", self.nanosecond/1000)!;
+			if (self.tz_utc)
 			{
-				f.print(off_secs < 0 ? "-" : "+");
-				f.printf(OFF_FMT, self.tz_hour_offset, self.tz_minute_offset);
+				n += f.print("Z")!;
+			}
+			else
+			{
+				int off_secs = self.offset_secs();
+				n += f.print(off_secs < 0 ? "-" : "+")!;
+				if (off_secs < 0) off_secs *= -1;
+				n += f.printf(OFFSET_FMT, off_secs / 3600, off_secs % 60)!;
 			}
 		case TIME_ONLY:
-			f.printf("%d:%d:%d", self.hour, self.minute, self.seconds);
-			if (self.nanosecond > 0) f.printf(".%d", self.nanosecond/1000);
+			n += f.printf(TIME_FMT, self.hour, self.minute, self.second)!;
+			if (self.nanosecond > 0) n += f.printf(".%d", self.nanosecond/1000)!;
 	}
+	return n;
 }
 
 fn DateTime? TomlDateTime.date_time(&self)
@@ -67,13 +74,13 @@ fn DateTime? TomlDateTime.date_time(&self)
 		case OFFSET_DATE_TIME:
 			dt = datetime::from_date(
 				self.year, Month.from_ordinal(self.month-1), self.day,
-				self.hour, self.minute, self.second,
-				self.nanosecond / 1000);
+				self.hour, self.minute, self.second, 0);
+			dt.usec = self.nanosecond / 1000;
 		case TIME_ONLY:
 			dt = datetime::from_date(
 				0, JANUARY, 1,
-				self.hour, self.minute, self.second,
-				self.nanosecond / 1000);
+				self.hour, self.minute, self.second, 0);
+			dt.usec = self.nanosecond / 1000;
 	}
 
 	if (self.kind == OFFSET_DATE_TIME)
@@ -87,7 +94,6 @@ fn DateTime? TomlDateTime.date_time(&self)
 enum TokenType
 {
 	NUMBER,
-	DASH,
 	COLON,
 	DOT,
 	T,
@@ -124,7 +130,6 @@ fn Token? Lexer.read_number(&self, usz maxlen)
 		self.pos += 1;
 	}
 	int number = self.input[start .. self.pos - 1].to_int()!;
-	io::printfn("num: %d", number);
 	return { NUMBER, number };
 }
 
@@ -170,7 +175,6 @@ fn void? parse_time(Lexer *lexer, TomlDateTime *dt)
 		usz start = lexer.pos;
 		int frac;
 		lexer.expect(NUMBER, &frac)!;
-		io::printfn("frac: %d", frac);
 		usz len = lexer.pos - start;
 		while (len < 9)
 		{
@@ -178,7 +182,6 @@ fn void? parse_time(Lexer *lexer, TomlDateTime *dt)
 			len += 1;
 		}
 		dt.nanosecond = frac;
-		io::printfn("nano: %d", frac);
 
 		tok = lexer.next()!;
 	}
@@ -206,7 +209,15 @@ fn void? parse_time(Lexer *lexer, TomlDateTime *dt)
 	}
 }
 
-fn DateTime? parse(String input)
+fn bool is_date_time(String input)
+{
+	Lexer lexer = { input, 0 };
+	if (catch lexer.expect(NUMBER)) return false;
+	if (try tok = lexer.next()) return (tok.type == COLON || tok.type == MINUS);
+	return false;
+}
+
+fn TomlDateTime? parse(String input)
 {
 	Lexer lexer = { input, 0 };
 	TomlDateTime dt = {};
@@ -240,7 +251,7 @@ fn DateTime? parse(String input)
 			return UNEXPECTED_TOKEN?;
 	}
 
-	return dt.date_time();
+	return dt;
 }
 
 
@@ -254,9 +265,15 @@ import std::time;
 
 fn void test_parse_date_time() @test
 {
-	String s = "1996-12-19T16:39:57-08:00";
-	DateTime dt = toml::time::parse(s)!!;
+	String s = "1996-12-19 16:39:57-08:00";
+	TomlDateTime toml_dt = toml::time::parse(s)!!;
 
+	@pool() {
+		String r = string::tformat("%s", toml_dt);
+		assert(s == r, "got: '%s', want: '%s'", r, s);
+	};
+
+	DateTime dt = toml_dt.date_time()!!;
 	assert(dt.year == 1996);
 	assert(dt.month.ordinal + 1 == 12);
 	assert(dt.day == 19);
@@ -267,8 +284,15 @@ fn void test_parse_date_time() @test
 
 fn void test_parse_utc() @test
 {
-	String s = "1996-12-19T16:39:57Z";
-	DateTime dt = toml::time::parse(s)!!;
+	String s = "1996-12-19 16:39:57Z";
+	TomlDateTime toml_dt = toml::time::parse(s)!!;
+
+	@pool() {
+		String r = string::tformat("%s", toml_dt);
+		assert(s == r, "got: '%s', want: '%s'", r, s);
+	};
+
+	DateTime dt = toml_dt.date_time()!!;
 	assert(dt.year == 1996);
 	assert(dt.month.ordinal + 1 == 12);
 	assert(dt.day == 19);
@@ -279,15 +303,29 @@ fn void test_parse_utc() @test
 
 fn void test_parse_utc_frac() @test
 {
-	String s = "1996-12-19T16:39:57.123456Z";
-	DateTime dt = toml::time::parse(s)!!;
+	String s = "1996-12-19 16:39:57.123456Z";
+	TomlDateTime toml_dt = toml::time::parse(s)!!;
+
+	@pool() {
+		String r = string::tformat("%s", toml_dt);
+		assert(s == r, "got: '%s', want: '%s'", r, s);
+	};
+
+	DateTime dt = toml_dt.date_time()!!;
 	assert(dt.usec == 123456, "got: %d", dt.usec);
 }
 
 fn void test_parse_date_only() @test
 {
 	String s = "1996-12-19";
-	DateTime dt = toml::time::parse(s)!!;
+	TomlDateTime toml_dt = toml::time::parse(s)!!;
+
+	@pool() {
+		String r = string::tformat("%s", toml_dt);
+		assert(s == r, "got: '%s', want: '%s'", r, s);
+	};
+
+	DateTime dt = toml_dt.date_time()!!;
 	assert(dt.year == 1996);
 	assert(dt.month.ordinal + 1 == 12);
 	assert(dt.day == 19);
@@ -299,8 +337,14 @@ fn void test_parse_date_only() @test
 fn void test_parse_time_only() @test
 {
 	String s = "16:39:57.999999";
-	DateTime dt = toml::time::parse(s)!!;
+	TomlDateTime toml_dt = toml::time::parse(s)!!;
 
+	@pool() {
+		String r = string::tformat("%s", toml_dt);
+		assert(s == r, "got: '%s', want: '%s'", r, s);
+	};
+
+	DateTime dt = toml_dt.date_time()!!;
 	assert(dt.year == 0);
 	assert(dt.month == JANUARY);
 	assert(dt.day == 1);
@@ -310,4 +354,12 @@ fn void test_parse_time_only() @test
 	assert(dt.usec == 999999);
 }
 
+fn void test_is_date_time() @test
+{
+	String[*] no = { "abc", "a-b-c", "a:b", "1999", "16.40" };
+	foreach (t : no) assert(!toml::time::is_date_time(t));
+
+	String[*] yes = { "2002-02-10", "15:12:12" };
+	foreach (t : yes) assert(toml::time::is_date_time(t));
+}
 
