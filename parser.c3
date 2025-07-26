@@ -4,8 +4,6 @@ import std::io;
 import std::collections::object;
 import std::collections::list;
 
-import toml::rfc3339;
-
 alias StringList = List {String};
 
 faultdef DUPLICATED_KEY,
