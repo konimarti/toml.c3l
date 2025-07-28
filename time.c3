@@ -162,7 +162,6 @@ fn Token? Lexer.read_number(&self, usz ndigits = 0)
 fn Token? Lexer.next(&self, usz ndigits = 0)
 {
 	if (self.pos >= self.input.len) return { .type = END };
-
 	char c = self.input[self.pos];
 	if (c == 0) return { .type = END };
 	switch (c)

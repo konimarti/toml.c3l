@@ -4,27 +4,27 @@ import std::io;
 import toml;
 
 const String USAGE = `
-usage: tomlv [-h] [-p]
+usage: tomlv [-h] [-j]
 
 Validate TOML config files read from stdin.
 
 options:
   -h       show this help message
-  -p       print as JSON to stdout
+  -j       print as tagged JSON to stdout
 `;
 
-fn void main(String[] args)
+fn int main(String[] args)
 {
-	bool verbose;
+	bool json;
 	foreach (arg : args)
 	{
 		switch (arg)
 		{
 			case "-h":
 				io::printn(USAGE);
-				return;
-			case "-p":
-				verbose = true;
+				return 0;
+			case "-j":
+				json = true;
 		}
 	}
 
@@ -32,9 +32,18 @@ fn void main(String[] args)
 	if (catch err = td)
 	{
 		io::eprintfn("  Invalid TOML: %s", err);
-		return;
+		return 1;
 	}
-	io::eprintn("\n  TOML file is valid.\n");
-	if (verbose) io::printn(td);
-	td.free();
+	defer td.free();
+
+	if (json)
+	{
+		io::printn(td);
+	}
+	else
+	{
+		io::eprintn("\n  TOML file is valid.\n");
+	}
+
+	return 0;
 }

@@ -231,15 +231,18 @@ fn bool? Parser.key(&self, StringList *list)
 
 		self.start = self.current;
 
+		bool dequote = false;
 		if (self.must('"'))
 		{
 			// quoted-key: basic-string
 			self.basic_string()!;
+			dequote = true;
 		}
 		else if (self.must('\''))
 		{
 			// quoted-key: literal-string
 			self.literal_string()!;
+			dequote = true;
 		}
 		else
 		{
@@ -249,7 +252,10 @@ fn bool? Parser.key(&self, StringList *list)
 
 		if (self.current <= self.start) return !list.is_empty();
 
-		list.push(self.text());
+		String text = self.text();
+		if (dequote && text.len >= 2) text = text[1 .. ^2];
+
+		list.push(text);
 
 		self.skip_ws()!;
 

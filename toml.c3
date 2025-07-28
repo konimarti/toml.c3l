@@ -1,7 +1,7 @@
 module toml;
 
 import std::io;
-import std::collections::object;
+import std::collections::object @public;
 
 struct TomlData (Printable)
 {
@@ -10,11 +10,82 @@ struct TomlData (Printable)
 
 fn usz? TomlData.to_format(&self, Formatter* formatter) @dynamic
 {
-	Object *obj = self.table;
-	if (obj == null) {
-		obj = &object::NULL_OBJECT;
+	Object *object = self.table;
+	if (object == null) {
+		object = &object::NULL_OBJECT;
 	}
-	return obj.to_format(formatter);
+	return to_tagged_json(object, formatter);
+}
+
+fn String tescape_json(String s)
+{
+	DString buf = dstring::temp();
+	foreach (c : s)
+	{
+		if (c == '"') buf.append_char('\\');
+		buf.append_char(c);
+	}
+	return buf.str_view();
+}
+
+fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
+{
+	switch (self.type)
+	{
+		case void:
+			return formatter.printf("{}")!;
+		case void*:
+			return formatter.printf("null")!;
+		case String:
+			if (try time::parse(self.s))
+			{
+				return formatter.printf(`{"type":"datetime","value":"%s"}`, self.s)!;
+			}
+			else
+			{
+				return formatter.printf(`{"type":"string","value":"%s"}`, tescape_json(self.s))!;
+			}
+		case bool:
+			return formatter.printf(`{"type":"bool","value":"%s"}`, self.b ? "true" : "false")!;
+		case ObjectInternalList:
+			usz n = formatter.printf("[")!;
+			foreach (i, ol : self.array)
+			{
+				if (i > 0) n += formatter.printf(",")!;
+				// n += ol.to_format(formatter)!;
+				n += to_tagged_json(ol, formatter)!;
+			}
+			n += formatter.printf("]")!;
+			return n;
+		case ObjectInternalMap:
+			usz n = formatter.printf("{")!;
+			@stack_mem(1024; Allocator mem)
+			{
+				foreach (i, key : self.map.keys(mem))
+				{
+					if (i > 0) n += formatter.printf(",")!;
+					n += formatter.printf(`"%s":`, tescape_json(key))!;
+					// n += self.map.get(key).to_format(formatter)!;
+					n += to_tagged_json(self.map.get(key), formatter)!;
+				}
+			};
+			n += formatter.printf("}")!;
+			return n;
+		default:
+			switch (self.type.kindof)
+			{
+				case SIGNED_INT:
+					return formatter.printf(`{"type":"integer","value":"%d"}`, (int128)self.i)!;
+				case UNSIGNED_INT:
+					return formatter.printf(`{"type":"integer","value":"%d"}`, (uint128)self.i)!;
+				case FLOAT:
+					return formatter.printf(`{"type":"float","value":"%g"}`, self.f)!;
+				case ENUM:
+					return formatter.printf("%d", self.i)!;
+				default:
+					return formatter.printf("<>")!;
+			}
+	}
 }
 
 fn Object*? TomlData.get(&self, String dotted_keys)
