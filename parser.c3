@@ -20,6 +20,7 @@ faultdef DUPLICATED_KEY,
 	MISSING_KEYVAL_SEPARATOR,
 	MISSING_TABLE_NAME,
 	MISSING_TERMINAL_QUOTE,
+	MISSING_NEWLINE,
 	MULTILINE_STRING_TOO_SHORT,
 	MULTIPLE_ERRORS;
 
@@ -35,7 +36,7 @@ struct Parser
 
 fn Parser* Parser.init(&self, String s, Allocator allocator)
 {
-	*self = {.s = s, .allocator = allocator, .start = 0, .current = 0, 
+	*self = {.s = s, .allocator = allocator, .start = 0, .current = 0,
 		.line = 1, .current_table = null};
 	return self;
 }
@@ -59,7 +60,7 @@ fn bool Parser.at_end(&self)
 
 fn void Parser.error(&self, String msg)
 {
-	io::eprintfn("line %d: %s", self.line, msg)!!;
+	io::eprintfn("TOML ERROR -- Line %d: %s", self.line, msg)!!;
 }
 
 fn bool is_ws(char c) => (c == 0x20 || c == 0x09);
@@ -406,14 +407,25 @@ fn Object*? Parser.toml(&self)
 
 			// synchronize parser after error by moving to the next
 			// newline.
-			while (non_eol(self.peek())) self.advance()!;
+			while (non_eol(self.peek()))
+			{
+				if (catch adv_err = self.advance())
+				{
+					if (adv_err == io::EOF) break LOOP;
+				}
+			}
 		}
 
 		self.must('\r');
 
-		if (!self.must('\n')) break LOOP;
-
-		self.line++;
+		if (!self.must('\n'))
+		{
+			if (self.at_end()) break LOOP;
+			self.error("Missing Newline after an expression");
+			last_error = MISSING_NEWLINE;
+			break LOOP;
+		}
+		self.line += 1;
 	}
 	if (last_error) return last_error?;
 	return obj;
