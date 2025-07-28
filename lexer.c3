@@ -5,7 +5,7 @@ import std::io; // FIXME: for debugging only
 enum TokenType
 {
 	EMPTY,
-	IDENTIFIER,
+	IDENTIFIER, // contains also INTEGER, BOOLEAN
 	STRING,
 	INTEGER,
 	FLOAT,
@@ -16,8 +16,8 @@ enum TokenType
 	COMMA,
 	SQUAREOPEN,
 	SQUARECLOSE,
-	ARRAYOPEN, // [[
-	ARRAYCLOSE, // ]]
+	ARRAYTABLEOPEN, // [[
+	ARRAYTABLECLOSE, // ]]
 	CURLYOPEN,
 	CURLYCLOSE,
 	NEWLINE,
@@ -28,12 +28,7 @@ enum TokenType
 struct Token
 {
 	TokenType type;
-	union {
-		String s;
-		long int64;
-		double fp64;
-		bool b;
-	}
+	String value;
 	usz lineno;
 	usz column;
 }
@@ -50,6 +45,29 @@ fn Lexer* Lexer.init(&lexer, String input)
 {
 	*lexer = { .input = input, .pos = 0, .lineno = 1, .column = 1 };
 	return lexer;
+}
+
+struct LexerState
+{
+	usz pos;
+	usz lineno;
+	usz column;
+}
+
+fn LexerState Lexer.save(&lexer) => { lexer.pos, lexer.lineno, lexer.column };
+fn Lexer* Lexer.restore(&lexer,  LexerState state)
+{
+	lexer.pos = state.pos;
+	lexer.lineno = state.lineno;
+	lexer.column = state.column;
+	return lexer;
+}
+fn String Lexer.text(&lexer, LexerState state) => lexer.input[state.pos .. lexer.pos - 1];
+
+fn void Lexer.report_error(&lexer, String msg)
+{
+	io::eprintfn("Line: %d, Column: %d -- Error: %s", lexer.lineno, lexer.column, msg);
+	// panic(" -- Stopped because of a lexer error --");
 }
 
 //
@@ -86,7 +104,7 @@ fn void Lexer.advance(&lexer)
 // Lexer: Utility functions
 //
 
-fn void Lexer.skip_whitespace_and_comments(&lexer)
+fn void Lexer.skip_whitespace(&lexer)
 {
 	char c;
 	while (!lexer.is_eof())
@@ -95,13 +113,6 @@ fn void Lexer.skip_whitespace_and_comments(&lexer)
 		if (c == ' ' || c == '\t' || c == '\r')
 		{
 			lexer.advance();
-		}
-		else if (c == '#')
-		{
-			while (!lexer.is_eof() && lexer.current_char() != '\n')
-			{
-				lexer.advance();
-			}
 		}
 		else
 		{
@@ -126,16 +137,21 @@ macro Token Lexer.issue_token(&lexer, TokenType type)
 		};
 }
 
-
 //
 // Lexer: Token scanning
 //
 
-fn Token Lexer.scan_identifier(&lexer) => @pool()
+fn Token Lexer.scan_identifier(&lexer, bool plus_prefix = false) => @pool()
 {
-	Token token = lexer.issue_token(EMPTY);
-	usz start = lexer.pos;
+	Token token = lexer.issue_token(IDENTIFIER);
+	LexerState start_state = lexer.save();
 	char c = lexer.current_char();
+
+	if (plus_prefix && c == '+')
+	{
+		lexer.advance();
+		c = lexer.current_char();
+	}
 
 	// Accept bare key chars
 	while (is_bare_key(c) && !lexer.is_eof())
@@ -144,8 +160,7 @@ fn Token Lexer.scan_identifier(&lexer) => @pool()
 		c = lexer.current_char();
 	}
 
-	token.type = IDENTIFIER;
-	token.s = lexer.input[start .. lexer.pos - 1];
+	token.value = lexer.text(start_state);
 	return token;
 }
 
@@ -154,63 +169,65 @@ fn Token Lexer.scan_identifier(&lexer) => @pool()
 fn Token Lexer.scan_string(&lexer)
 {
 	Token token = lexer.issue_token(STRING);
-	DString buf = dstring::temp();
 
 	char quote_char = lexer.current_char();
 	lexer.advance();
 
+	LexerState start_state = lexer.save();
+
 	char c = lexer.current_char();
 	while (c != quote_char && !lexer.is_eof())
 	{
-		// Handle escape sequences for quoted strings
-		if (quote_char == '"' && c == '\\')
-		{
-			lexer.advance();
-			c = lexer.current_char();
-			switch (c)
-			{
-			case 'n' : buf.append_char('\n');
-			case 't' : buf.append_char('\t');
-			case '"' : buf.append_char('"');
-			case '\\': buf.append_char('\\');
-			default  : buf.append_char(c);
-			}
-		}
-		else
-		{
-			buf.append_char(c);
-		}
+		// // Handle escape sequences for quoted strings
+		// if (quote_char == '"' && c == '\\')
+		// {
+		// 	lexer.advance();
+		// 	c = lexer.current_char();
+		// 	switch (c)
+		// 	{
+		// 	case 'n' : buf.append_char('\n');
+		// 	case 't' : buf.append_char('\t');
+		// 	case '"' : buf.append_char('"');
+		// 	case '\\': buf.append_char('\\');
+		// 	default  : buf.append_char(c);
+		// 	}
+		// }
+		// else
+		// {
+		// 	buf.append_char(c);
+		// }
 		lexer.advance();
 		c = lexer.current_char();
 	}
+
+	token.value = lexer.text(start_state);
+
 	lexer.advance(); // Skip closing quote
-	token.s = buf.str_view();
 	return token;
 }
 
 alias IsValidChar @local = fn bool(char);
 
-// Scans for a number (integer, float) [or datetime]
+// Scans for a number (integer, float)
 fn Token Lexer.scan_number(&lexer) => @pool()
 {
 	Token token = lexer.issue_token(INTEGER);
-	DString buf = dstring::temp();
+	LexerState start_state = lexer.save();
 
-	usz start = lexer.pos;
 	char c = lexer.current_char();
+	bool bare_key = true;
 
 	// Optional leading sign
 	if (c == '-' || c == '+')
 	{
-		buf.append_char(c);
 		lexer.advance();
 		c = lexer.current_char();
+		if (c == '+') bare_key = false;
 	}
 
 	// Check for hex, bin, oct prefix (0x, 0b, 0o) after leading zero
 	if (c == '0')
 	{
-		buf.append_char(c);
 		lexer.advance();
 		c = lexer.current_char();
 
@@ -228,48 +245,43 @@ fn Token Lexer.scan_number(&lexer) => @pool()
 			is_valid_char = &ascii::is_odigit;
 		default:
 			// TODO: report error for invalid sequence
-			unreachable("scan_number: faulty integer with 0 prefix");
+			// unreachable("scan_number: faulty integer with 0 prefix");
+			io::eprintn("scan_number: faulty integer with 0 prefix");
+			lexer.restore(start_state);
+			return token; // FIXME: this should be an error value, indicating we haven't scanned a Token yet
 		}
 
-		buf.append_char(c);
 		lexer.advance();
 		c = lexer.current_char();
 
 		// Accept digits and underscores
 		while ((is_valid_char(c) || c == '_') && !lexer.is_eof())
 		{
-			if (c != '_') buf.append_char(c);
 			lexer.advance();
 			c = lexer.current_char();
+		}
+
+		if (is_bare_key(c))
+		{
+			if (bare_key)
+			{
+				lexer.restore(start_state);
+				return lexer.scan_identifier();
+			}
+			else
+			{
+				lexer.report_error("cannot read bare key");
+			}
 		}
 
 		token.type = INTEGER;
-		token.int64 = buf.str_view().to_int()!!; // TODO: Return error?
-		return token;
-	}
-	else if (c == 'n' || c == 'i')
-	{
-		// Read either "nan" or "inf"
-		for (usz i = 0; i < 3 && !lexer.is_eof(); i++)
-		{
-			buf.append_char(c);
-			lexer.advance();
-			c = lexer.current_char();
-		}
-
-		// Fix for String.to_double() in C3 stdlib:
-		if (buf.str_view()[^3..] == "inf") buf.append_chars("inity");
-
-		// Return parsed float
-		token.type = FLOAT;
-		token.fp64 = buf.str_view().to_double()!!; // TODO: handle error?
+		token.value = lexer.text(start_state);
 		return token;
 	}
 
 	// Read integer
 	while ((is_digit(c) || c == '_') && !lexer.is_eof())
 	{
-		if (c != '_') buf.append_char(c);
 		lexer.advance();
 		c = lexer.current_char();
 	}
@@ -279,55 +291,41 @@ fn Token Lexer.scan_number(&lexer) => @pool()
 		case '.':
 		case 'e':
 		case 'E':
-			buf.append_char(c);
+			// FLOAT
 			lexer.advance();
 			c = lexer.current_char();
 
 			// read float
 			while ((is_digit(c) || @ok("_eE.-+".index_of_char(c))) && !lexer.is_eof())
 			{
-				if (c != '_') buf.append_char(c);
 				lexer.advance();
 				c = lexer.current_char();
 			}
 
 			token.type = FLOAT;
-			token.fp64 = buf.str_view().to_double()!!; // TODO: handle error?
+			token.value = lexer.text(start_state);
 			return token;
 
-		case 't':
-		case 'T':
 		case '-':
 		case ':':
-			buf.append_char(c);
-			lexer.advance();
-			c = lexer.current_char();
-
-			// read datetime
-			while ((is_digit(c) || @ok("-tT:.Z+".index_of_char(c))) && !lexer.is_eof())
-			{
-				buf.append_char(c);
-				lexer.advance();
-				c = lexer.current_char();
-			}
-
-			token.type = DATETIME;
-			token.s = lexer.input[start .. buf.len() - 1];
+			// DATETIME
+			lexer.restore(start_state);
+			return lexer.scan_datetime();
+		default:
+			// INTEGER
+			token.value = lexer.text(start_state);
 			return token;
 	}
-
-	token.int64 = buf.str_view().to_long()!!;
-	return token;
 }
 
 fn Token Lexer.scan_comment(&lexer)
 {
 	Token token = lexer.issue_token(COMMENT);
-	usz start = lexer.pos;
+	LexerState start_state = lexer.save();
 	lexer.advance(); // Consume "#"
 	char c = lexer.current_char();
-	while (!is_newline(c) && !lexer.is_eof()) lexer.advance();
-	token.s = lexer.input[start .. lexer.pos - 1];
+	while (non_eol(c) && !lexer.is_eof()) lexer.advance();
+	token.value = lexer.text(start_state);
 	return token;
 }
 
@@ -337,21 +335,40 @@ fn Token Lexer.scan_comment(&lexer)
 fn Token Lexer.scan_datetime(&lexer)
 {
 	Token token = lexer.issue_token(DATETIME);
-	usz start = lexer.pos;
+	LexerState start_state = lexer.save();
 	char c = lexer.current_char();
+	bool bare_key = true;
 
 	// DateTime in TOML can contain digits, '-', ':', '.', 'Z', 'T'
 	while ((ascii::is_digit(c) ||
 		c == '-' || c == '+' ||
 		c == 'T' || c == 't' ||
 		c == 'Z' || c == 'z' ||
-		c == '.' || c == ':') && !lexer.is_eof())
+		c == '.' || c == ':' || c == ' ') && !lexer.is_eof())
 	{
 		lexer.advance();
 		c = lexer.current_char();
+		if (c == ' ' && !is_digit(lexer.next_char())) break;
+		if (c == '+' || c == '.' || c == ':') bare_key = false;
 	}
 
-	token.s = lexer.input[start .. lexer.pos - 1];
+	if (is_bare_key(c))
+	{
+		if (bare_key)
+		{
+			lexer.restore(start_state);
+			return lexer.scan_identifier();
+		}
+		else
+		{
+			lexer.report_error("failed to scan for datetime");
+		}
+	}
+
+	// FIXME: DateTime need validation here; otherwise, 2009-09-9999 would
+	// be valid
+
+	token.value = lexer.text(start_state);
 	return token;
 }
 
@@ -363,12 +380,12 @@ fn Token Lexer.scan_punctuation(&lexer)
 	// Lookahead for two-character tokens ([[ or ]])
 	if (c == '[' && lexer.next_char() == '[')
 	{
-		token.type = ARRAYOPEN;;
+		token.type = ARRAYTABLEOPEN;;
 		lexer.advance(); lexer.advance();
 	}
 	else if (c == ']' && lexer.next_char() == ']')
 	{
-		token.type = ARRAYCLOSE;
+		token.type = ARRAYTABLECLOSE;
 		lexer.advance(); lexer.advance();
 	}
 	else
@@ -395,7 +412,7 @@ fn Token Lexer.scan_punctuation(&lexer)
 
 fn Token Lexer.next_token(&lexer)
 {
-	lexer.skip_whitespace_and_comments();
+	lexer.skip_whitespace();
 
 	if (lexer.is_eof())
 	{
@@ -416,37 +433,47 @@ fn Token Lexer.next_token(&lexer)
 		return lexer.scan_number();
 	}
 
-	// Identifiers (bare keys, true, false, datetime, nan, infinity)
+	// Identifiers (bare keys, true, false, 'nan', 'inf')
 	if (is_bare_key(c))
 	{
 		Token token = lexer.scan_identifier();
 
-		// If identifier matches 'true', 'false', 'nan', 'infinity',
+		// If identifier matches 'true', 'false', 'nan', 'inf',
 		// reclassify token type
-		if (token.s.starts_with("true"))
+		switch (token.value)
 		{
+		case "true":
 			token.type = BOOLEAN;
-			token.b = true;
-		}
-		else if (token.s.starts_with("false"))
-		{
+		case "false":
 			token.type = BOOLEAN;
-			token.b = false;
-		}
-		else if (token.s.starts_with("nan"))
-		{
+		case "nan":
+		case "-nan":
 			token.type = FLOAT;
-			token.fp64 = token.s.to_double()!!; // TODO: Return error?
-		}
-		else if (token.s.starts_with("inf"))
-		{
+		case "inf":
+		case "-inf":
 			token.type = FLOAT;
-			token.fp64 = double.inf;
 		}
 		return token;
 	}
 
-	io::printn("D");
+	// Special case for '+nan' and '+inf'
+	if (c == '+' && (lexer.next_char() == 'n' || lexer.next_char() == 'i'))
+	{
+		Token token = lexer.scan_identifier(true);
+
+		// If identifier matches '+nan', '+inf', reclassify token type
+		switch (token.value)
+		{
+		case "+nan":
+			token.type = FLOAT;
+			return token;
+		case "+inf":
+			token.type = FLOAT;
+			return token;
+		default:
+			lexer.report_error("could not scan value");
+		}
+	}
 
 	// Punctuation and structural tokens
 	switch (c)
@@ -457,17 +484,20 @@ fn Token Lexer.next_token(&lexer)
 	case ']':
 	case '{':
 	case '}':
+	case '.':
 		return lexer.scan_punctuation();
 	case '\n':
-		defer lexer.advance();
-		return lexer.issue_token(NEWLINE);
+		Token token = lexer.issue_token(NEWLINE);
+		lexer.advance();
+		return token;
 	case '#':
 		return lexer.scan_comment();
 	default:
 		// Unexpected/illegal character
 		// TODO: lexer.report_error()
 		io::printfn(" -- boom -- ");
-		defer lexer.advance();
-		return lexer.issue_token(ERROR);
+		Token token = lexer.issue_token(ERROR);
+		lexer.advance();
+		return token;
 	}
 }
