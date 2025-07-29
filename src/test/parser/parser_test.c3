@@ -375,6 +375,42 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/spec/inline-table-2-0",
 			.input =  "[product]\ntype = { name = \"Nail\" }\ntype.edible = false",
 		},
+		{
+			.name = "invalid/local-time/second-over",
+			.input = "d = 00:00:61", // 60 is allowed for leap-year but not 61
+		},
+		{
+			.name = "invalid/local-time/time-no-leads",
+			.input = "d = 1:32:00", // leading 0 required
+		},
+		{
+			.name = "invalid/local-time/time-no-leads-2",
+			.input = "d = 01:32:0", // leading 0 required
+		},
+		{
+			.name = "invalid/local-date/feb-29",
+			.input = "\"not a leap year\" = 2100-02-29",
+		},
+		{
+			.name = "invalid/local-date/feb-30",
+			.input = "\"only 28 or 29 days in february\" = 1988-02-30",
+		},
+		{
+			.name = "invalid/local-datetime/feb-29",
+			.input = "\"not a leap year\" = 2100-02-29T15:15:15",
+		},
+		{
+			.name = "invalid/local-datetime/feb-30",
+			.input = "\"only 28 or 29 days in february\" = 1988-02-30T15:15:15",
+		},
+		{
+			.name = "invalid/local-datetime/hour-over",
+			.input = "d = 2006-01-01T24:00:00", // hour 00-23
+		},
+		{
+			.name = "invalid/local-time/hour-over",
+			.input = "d = 24:00:00", // hour 00-23
+		},
 	};
 
 	foreach (t : invalid_tests)

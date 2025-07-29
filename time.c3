@@ -63,22 +63,31 @@ fn usz? TomlDateTime.to_format(&self, Formatter* f) @dynamic
 }
 
 // Performs crude validation of the date time data
-fn bool? TomlDateTime.validate(&self)
+fn bool TomlDateTime.valid_ranges(&self)
 {
 	switch (self.kind)
 	{
 		case DATE_ONLY:
 		case LOCAL_DATE_TIME:
 		case OFFSET_DATE_TIME:
-			if (self.year < 0 || self.year > 24) return false;
-			if (self.month < 0 || self.month > 60) return false;
-			if (self.day < 0 || self.day > 60) return false;
+			if (self.year < 0 || self.year > 9999) return false;
+			if (self.month < 1 || self.month > 12) return false;
+			if (self.day < 1 || self.day > 31) return false;
 			nextcase;
 		case TIME_ONLY:
-			if (self.hour < 0 || self.hour > 24) return false;
-			if (self.minute < 0 || self.minute > 60) return false;
+			if (self.hour < 0 || self.hour > 23) return false;
+			if (self.minute < 0 || self.minute > 59) return false;
 			if (self.second < 0 || self.second > 60) return false;
 	}
+
+	// Leap-year
+	bool leap = (self.year % 4 == 0 && self.year % 100 != 0) ||
+		(self.year % 400 == 0);
+
+	// February checks
+	if (self.month == 2 && self.day > (leap ? 29 : 28)) return false;
+
+
 	return true;
 }
 
@@ -115,6 +124,8 @@ fn DateTime? TomlDateTime.date_time(&self)
 
 module toml::time::impl @private;
 
+faultdef UNKNOWN_CHAR, UNEXPECTED_TOKEN, UNEXPECTED_DIGITS;
+
 enum TokenType
 {
 	NUMBER,
@@ -127,8 +138,6 @@ enum TokenType
 	SPACE,
 	END
 }
-
-faultdef UNKNOWN_CHAR, UNEXPECTED_TOKEN, UNEXPECTED_DIGITS;
 
 struct Token
 {

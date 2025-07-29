@@ -3,6 +3,8 @@ module toml::parser;
 import std::ascii;
 import std::collections::object;
 
+import toml::time;
+
 // integer = dec-int / hex-int / oct-int / bin-int
 // minus = 0x2D
 // plus = 0x2B
@@ -61,7 +63,11 @@ fn Object*? Parser.number_or_datetime(&self)
 		case FLOAT:
 			return object::new_float(str.to_double()!, self.allocator);
 		case DATETIME:
-			return object::new_string(str, self.allocator);
+			if (try dt = toml::time::parse(str) && dt.valid_ranges())
+			{
+				return object::new_string(str, self.allocator);
+			}
+			return INVALID_DATETIME?;
 		default:
 			self.error("invalid token type in parsing a number of a datetime.");
 			return parser::INVALID_TOKEN_TYPE?;
