@@ -19,6 +19,10 @@ faultdef DUPLICATED_KEY,
 	INVALID_UNICODE,
 	INVALID_UNDERSCORE,
 	INVALID_SCALAR_UNICODE,
+ 	INVALID_LINE_ENDING_BACKSLASH,
+	INVALID_TABLE,
+	INVALID_ARRAY_TABLE,
+	INVALID_KEY,
 	UNCLOSED_INLINE_TABLE,
 	UNCLOSED_STD_TABLE,
 	UNCLOSED_ARRAY_TABLE,
@@ -29,9 +33,6 @@ faultdef DUPLICATED_KEY,
 	MISSING_TERMINAL_QUOTE,
 	MISSING_NEWLINE,
 	MULTILINE_STRING_TOO_SHORT,
- 	INVALID_LINE_ENDING_BACKSLASH,
-	INVALID_TABLE,
-	INVALID_ARRAY_TABLE,
 	UNMUTABLE_INLINE_TABLES,
 	UNSIGNED_WITH_SIGN,
 	MULTIPLE_ERRORS;
@@ -284,6 +285,11 @@ fn void? Parser.insert(&self, Object *table, StringList k, Object* v)
 {
 	String key = k.pop()!;
 	Object* target = self.create_table(k, table)!;
+	if (!target.is_keyable())
+	{
+		self.error("Key does not point to a table");
+		return INVALID_KEY?;
+	}
 	if (target.has_key(key))
 	{
 		self.error("key is already used; duplicated keys are not supported.");
