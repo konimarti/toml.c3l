@@ -17,6 +17,7 @@ faultdef DUPLICATED_KEY,
 	INVALID_ESCAPE_SEQUENCE,
 	INVALID_TOKEN_TYPE,
 	INVALID_UNICODE,
+	INVALID_UNDERSCORE,
 	INVALID_SCALAR_UNICODE,
 	UNCLOSED_INLINE_TABLE,
 	UNCLOSED_STD_TABLE,
@@ -32,6 +33,7 @@ faultdef DUPLICATED_KEY,
 	INVALID_TABLE,
 	INVALID_ARRAY_TABLE,
 	UNMUTABLE_INLINE_TABLES,
+	UNSIGNED_WITH_SIGN,
 	MULTIPLE_ERRORS;
 
 struct Parser
@@ -268,7 +270,7 @@ fn bool? Parser.key(&self, StringList *list)
 		if (self.current <= self.start) return !list.is_empty();
 
 		String text = self.text();
-		if (dequote && text.len >= 2) text = text[1 .. ^2];
+		if (dequote && text.len > 2) text = text[1 .. ^2];
 
 		list.push(text);
 

@@ -411,6 +411,42 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/local-time/hour-over",
 			.input = "d = 24:00:00", // hour 00-23
 		},
+		{
+			.name = "invalid/key/newline-4",
+			.input = "\"\"\"long\nkey\"\"\" = 1",
+		},
+		{
+			.name = "invalid/key/newline-5",
+			.input = "'''long\nkey''' = 1",
+		},
+		{
+			.name = "invalid/integer/negative-bin",
+			.input = "negative-bin = -0b11010110",
+		},
+		{
+			.name = "invalid/integer/negative-hex",
+			.input = "negative-hex = -0xff",
+		},
+		{
+			.name = "invalid/integer/negative-oct",
+			.input = "negative-oct = -0o755",
+		},
+		{
+			.name = "invalid/integer/positive-hex",
+			.input = "positive-hex = +0xff",
+		},
+		{
+			.name = "invalid/integer/trailing-us",
+			.input = "trailing-us = 123_",
+		},
+		{
+			.name = "invalid/integer/trailing-us-hex",
+			.input = "trailing-us-hex = 0x1_",
+		},
+		{
+			.name = "invalid/integer/us-after-hex",
+			.input = "us-after-hex = 0x_1",
+		},
 	};
 
 	foreach (t : invalid_tests)

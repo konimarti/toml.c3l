@@ -44,14 +44,16 @@ struct Token
 {
 	TokenType type;
 	DString s;
+	bool has_sign;
 }
 
-fn Object*? Parser.number_or_datetime(&self)
+fn Object*? Parser.number_or_datetime(&self) => @pool()
 {
-	Token tok;
-
-	tok.s.init(self.allocator, 16);
-	defer tok.s.free();
+	Token tok = {
+		.type = TokenType.INTEGER,
+		.s = dstring::temp(),
+		.has_sign = self.peek() == '+' || self.peek() == '-'
+	};
 
 	self.integer(&tok)!;
 
@@ -74,12 +76,28 @@ fn Object*? Parser.number_or_datetime(&self)
 	}
 }
 
+fn bool Parser.valid_underscore(&self, Accept is_valid = &ascii::is_digit) @local
+{
+	String str @noinit;
+	usz i, n;
+
+	str = self.s;
+	i = self.current;
+	n = str.len;
+
+	assert(str[i] == '_');
+
+	if (i < 1 || i + 1 >= n) return false;
+	if (is_valid(str[i - 1]) && is_valid(str[i + 1])) return true;
+	return false;
+}
+
 fn void? Parser.integer(&self, Token *tok)
 {
-	tok.type = TokenType.INTEGER;
 	switch (self.peek())
 	{
 		case '_':
+			if (!self.valid_underscore()) return INVALID_UNDERSCORE?;
 			self.advance()!;
 			self.integer(tok)!;
 		case '+':
@@ -88,14 +106,17 @@ fn void? Parser.integer(&self, Token *tok)
 			self.integer(tok)!;
 		case 'x':
 		case 'X':
+			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
 			tok.s.append_char(self.advance()!);
 			self.hex_int(tok.s)!;
 		case 'o':
 		case 'O':
+			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
 			tok.s.append_char(self.advance()!);
 			self.oct_int(tok.s)!;
 		case 'b':
 		case 'B':
+			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
 			tok.s.append_char(self.advance()!);
 			self.bin_int(tok.s)!;
 		case 'n':
@@ -144,6 +165,7 @@ fn void? Parser.parse_float(&self, Token *tok)
 	switch (self.peek())
 	{
 		case '_':
+			if (!self.valid_underscore()) return INVALID_UNDERSCORE?;
 			self.advance()!;
 		case '+':
 		case '-':
@@ -187,6 +209,7 @@ alias Accept = fn bool(char);
 fn void? Parser.parse_int(&self, DString s, Accept accept)
 {
 	char c;
+
 	while LOOP: (1)
 	{
 		c = self.peek();
@@ -195,6 +218,7 @@ fn void? Parser.parse_int(&self, DString s, Accept accept)
 			case accept(c):
 				s.append_char(self.advance()!);
 			case c == '_':
+				if (!self.valid_underscore(accept)) return INVALID_UNDERSCORE?;
 				self.advance()!;
 			default:
 				break LOOP;
