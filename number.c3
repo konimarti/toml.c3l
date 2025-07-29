@@ -58,6 +58,23 @@ fn Object*? Parser.number_or_datetime(&self) => @pool()
 	self.integer(&tok)!;
 
 	String str = tok.s.str_view();
+
+	// Leading zeros
+	if (tok.has_sign)
+	{
+		if (str.len >= 3 && str[1] == '0' && ascii::is_digit(str[2]))
+		{
+			return INVALID_LEADING_ZERO?;
+		}
+	}
+	else
+	{
+		if (str.len >= 2 && str[0] == '0' && ascii::is_digit(str[1]))
+		{
+			return INVALID_LEADING_ZERO?;
+		}
+	}
+
 	switch (tok.type)
 	{
 		case INTEGER:
@@ -76,6 +93,9 @@ fn Object*? Parser.number_or_datetime(&self) => @pool()
 	}
 }
 
+<*
+ Valid numbers around underscore
+*>
 fn bool Parser.valid_underscore(&self, Accept is_valid = &ascii::is_digit) @local
 {
 	String str @noinit;
@@ -105,17 +125,14 @@ fn void? Parser.integer(&self, Token *tok)
 			tok.s.append_char(self.advance()!);
 			self.integer(tok)!;
 		case 'x':
-		case 'X':
 			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
 			tok.s.append_char(self.advance()!);
 			self.hex_int(tok.s)!;
 		case 'o':
-		case 'O':
 			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
 			tok.s.append_char(self.advance()!);
 			self.oct_int(tok.s)!;
 		case 'b':
-		case 'B':
 			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
 			tok.s.append_char(self.advance()!);
 			self.bin_int(tok.s)!;
@@ -129,7 +146,7 @@ fn void? Parser.integer(&self, Token *tok)
 		case ':':
 			self.date_time(tok)!;
 		case '-':
-			// can be either int or date_time
+			// Either int or date_time
 			tok.s.append_char(self.advance()!);
 			if (tok.s.len() > 4)
 			{

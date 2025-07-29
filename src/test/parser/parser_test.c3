@@ -207,12 +207,12 @@ fn void parser_value_integer() @test
 		},
 		{
 			.name = "hex-int case",
-			.input = `0XbEeF`,
+			.input = `0xbEeF`,
 			.want = 48879,
 		},
 		{
 			.name = "hex-int with underscore",
-			.input = `0Xbe_ef`,
+			.input = `0xbe_ef`,
 			.want = 48879,
 		},
 		{
@@ -446,6 +446,30 @@ fn void parser_toml_test_invalid() @test => @pool()
 		{
 			.name = "invalid/integer/us-after-hex",
 			.input = "us-after-hex = 0x_1",
+		},
+		{
+			.name = "invalid/integer/leading-zero-1",
+			.input = "leading-zero-1 = 01",
+		},
+		{
+			.name = "invalid/integer/leading-zero-2",
+			.input = "leading-zero-2 = 00",
+		},
+		{
+			.name = "invalid/integer/leading-zero-3",
+			.input = "leading-zero-3 = 0_0",
+		},
+		{
+			.name = "invalid/integer/leading-zero-sign-1",
+			.input = "leading-zero-sign-1 = -01",
+		},
+		{
+			.name = "invalid/integer/leading-zero-sign-2",
+			.input = "leading-zero-sign-1 = +01",
+		},
+		{
+			.name = "invalid/integer/leading-zero-sign-3",
+			.input = "leading-zero-sign-1 = +0_1",
 		},
 	};
 
