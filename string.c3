@@ -1,6 +1,7 @@
 module toml::parser;
 
 import std::io;
+import std::encoding::hex;
 import std::collections::object;
 
 const ESCAPE = '\\';
@@ -170,21 +171,22 @@ fn void? Parser.mlb_content(&self, DString *buf)
 			if (escape_seq_char(self.peek()))
 			{
 				char u;
-				int n;
+				usz n, start;
 
 				buf.append_char(ESCAPE);
 
 				u = self.advance()!;
 				buf.append_char(u);
 
-				n = 0;
 				switch (u)
 				{
 					case 0x75: n = 4; // \u
 					case 0x55: n = 8; // \U
+					default: continue;
 				}
 
-				while (n--)
+				start = self.current;
+				for (usz i = 0; i < n; i++)
 				{
 					if (self.peek().is_xdigit())
 					{
@@ -196,6 +198,8 @@ fn void? Parser.mlb_content(&self, DString *buf)
 						return parser::INVALID_ESCAPE_UNICODE?;
 					}
 				}
+
+				validate_unicode(self.s[start:n])!;
 
 				continue;
 			}
@@ -235,21 +239,23 @@ fn void? Parser.basic_string(&self)
 		}
 
 		// escaped
-		if (self.must(ESCAPE)) {
+		if (self.must(ESCAPE))
+		{
 			if (escape_seq_char(self.peek()))
 			{
 				char u;
-				int n;
+				usz n, start;
 
 				u = self.advance()!;
-				n = 0;
 				switch (u)
 				{
 					case 0x75: n = 4;
 					case 0x55: n = 8;
+					default: continue;
 				}
 
-				while (n--)
+				start = self.current;
+				for (usz i = 0; i < n; i++)
 				{
 					if (self.peek().is_xdigit())
 					{
@@ -261,6 +267,8 @@ fn void? Parser.basic_string(&self)
 						return parser::INVALID_ESCAPE_UNICODE?;
 					}
 				}
+
+				validate_unicode(self.s[start:n])!;
 
 				continue;
 			}
@@ -378,4 +386,31 @@ fn void? Parser.literal_string(&self)
 		}
 		self.advance()!;
 	}
+}
+
+<*
+ Return true if u is between 0000 to D7FF
+ or between E000 to 10FFFF
+*>
+fn bool is_scalar_unicode(Char32 u)
+{
+	if ((u > 0x0000 && u <= 0xD7FF) ||
+		(u > 0xE000 && u <= 0x10FFFF)) return true;
+	return false;
+}
+
+fn void? validate_unicode(String hex) => @pool()
+{
+	// Decode from hex
+	char[] decoded = hex::tdecode(hex)!;
+
+	// Trim any leading zeros
+	while (decoded.len && decoded[0] == 0) decoded = decoded[1 .. ];
+
+	// Convert to unicode (uint)
+	usz nbytes = decoded.len;
+	Char32 code_point = conv::utf8_to_char32(decoded, &nbytes)!;
+
+	// Check that codepoint is a scalar unicode
+	if (!is_scalar_unicode(code_point)) return parser::INVALID_SCALAR_UNICODE?;
 }

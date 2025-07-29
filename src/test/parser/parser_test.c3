@@ -365,11 +365,11 @@ fn void parser_toml_test_invalid() @test => @pool()
 		},
 		{
 			.name = "invalid/table/basic-out-of-range-unicode-escape-1",
-			.input = "\"\UFFFFFFFF\"",
+			.input = `"\UFFFFFFFF"`,
 		},
 		{
 			.name = "invalid/table/basic-out-of-range-unicode-escape-2",
-			.input =  "\"\U00D80000\"",
+			.input =  `"\U00D80000"`,
 		},
 	};
 
