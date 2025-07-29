@@ -7,22 +7,28 @@ import std::collections::list;
 alias StringList = List {String};
 
 faultdef DUPLICATED_KEY,
+	DUPLICATED_TABLE,
 	INVALID_BOOLEAN,
 	INVALID_QUOTE,
 	INVALID_TERMINAL_QUOTES,
 	INVALID_ESCAPE_UNICODE,
 	INVALID_ESCAPE_SEQUENCE,
 	INVALID_TOKEN_TYPE,
+	INVALID_UNICODE,
 	UNCLOSED_INLINE_TABLE,
 	UNCLOSED_STD_TABLE,
 	UNCLOSED_ARRAY_TABLE,
 	UNCLOSED_QUOTE,
+	UNCLOSED_MULTILINE,
 	MISSING_KEYVAL_SEPARATOR,
 	MISSING_TABLE_NAME,
 	MISSING_TERMINAL_QUOTE,
 	MISSING_NEWLINE,
 	MULTILINE_STRING_TOO_SHORT,
-	MULTIPLE_ERRORS;
+	MULTIPLE_ERRORS,
+ 	INVALID_LINE_ENDING_BACKSLASH,
+	INVALID_TABLE,
+	INVALID_ARRAY_TABLE;
 
 struct Parser
 {
@@ -267,7 +273,7 @@ fn bool? Parser.key(&self, StringList *list)
 fn void? Parser.insert(&self, Object *table, StringList k, Object* v)
 {
 	String key = k.pop()!;
-	Object* target = self.get_table(k, table)!;
+	Object* target = self.create_table(k, table)!;
 	if (target.has_key(key))
 	{
 		self.error("key is already used; duplicated keys are not supported.");
@@ -302,10 +308,25 @@ fn void? Parser.keyval(&self, Object *obj)
 	self.insert(obj, key, val)!;
 }
 
-fn Object*? Parser.get_table(&self, StringList tables, Object *cur, bool create_as_array = false)
+fn Object*? Parser.get_table(&self, StringList tables, Object *cur)
 {
-	foreach(table : tables) cur = cur.get_or_create_obj(table);
+	foreach(table : tables)
+	{
+		if (!cur.is_keyable()) return INVALID_TABLE?;
+		cur = cur.get(table)!;
+	}
+	return cur;
+}
+
+fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool create_as_array = false)
+{
+	foreach(table : tables)
+	{
+		if (!cur.is_keyable()) return INVALID_TABLE?;
+		cur = cur.get_or_create_obj(table);
+	}
 	if (create_as_array) {
+		if (!cur.is_indexable()) return INVALID_ARRAY_TABLE?;
 		cur.push_object(object::new_obj(self.allocator));
 	}
 	if (cur.is_array()) {
@@ -344,7 +365,24 @@ fn Object*? Parser.table(&self, Object *obj)
 		return MISSING_TABLE_NAME?;
 	}
 
-	Object *cur = self.get_table(key, obj, create_as_array)!;
+	// Verfiy that table does not exist yet
+	if (try tab = self.get_table(key, obj))
+	{
+		if (create_as_array)
+		{
+			// Array table already exists and now check that it
+			// actually is an array (is_indexable())
+			if (!tab.is_array()) return INVALID_ARRAY_TABLE?;
+		}
+		else
+		{
+			// Regular table already exists
+			self.error("table already exists");
+			return DUPLICATED_TABLE?;
+		}
+	}
+
+	Object *cur = self.create_table(key, obj, create_as_array)!;
 
 	self.skip_ws()!;
 
@@ -378,6 +416,7 @@ fn void? Parser.expression(&self, Object *obj)
 	{
 		self.keyval(self.current_table)!;
 	}
+
 
 	self.skip_ws()!;
 	self.skip_comment()!;
@@ -425,6 +464,7 @@ fn Object*? Parser.toml(&self)
 			last_error = MISSING_NEWLINE;
 			break LOOP;
 		}
+
 		self.line += 1;
 	}
 	if (last_error) return last_error?;

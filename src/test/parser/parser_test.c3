@@ -329,3 +329,54 @@ fn void parser_value_float() @test
 		}
 	}
 }
+
+struct InvalidToml
+{
+	String name;
+	String input;
+}
+
+fn void parser_toml_test_invalid() @test => @pool()
+{
+	InvalidToml[*] invalid_tests = {
+		{
+			.name = "invalid/table/overwrite-with-deep-table",
+			.input = "a=1\n[a.b.c.d]",
+		},
+		{
+			.name = "invalid/table/super-twice",
+			.input = "[a.b]\n[a]\n[a]",
+		},
+		{
+			.name = "invalid/table/overwrite-bool-with-array",
+			.input = "a=true\n[[a]]",
+		},
+		{
+			.name = "invalid/table/duplicated-table-array",
+			.input = "[tbl]\n[[tbl]]",
+		},
+		{
+			.name = "invalid/table/multiline-no-close-5",
+			.input = "bee = \"\"\"\nhee\ngee\\",
+		},
+		{
+			.name = "invalid/table/multiline-escape-space-2",
+			.input = "bee = \"\"\"\n hee \\n gee \\   \"\"\"",
+		},
+		{
+			.name = "invalid/table/basic-out-of-range-unicode-escape-1",
+			.input = "\"\UFFFFFFFF\"",
+		},
+		{
+			.name = "invalid/table/basic-out-of-range-unicode-escape-2",
+			.input =  "\"\U00D80000\"",
+		},
+	};
+
+	foreach (t : invalid_tests)
+	{
+		toml::parser::Parser p;
+		p.init(t.input, tmem);
+		assert(!@ok(p.toml()), "unittest '%s' should fail.", t.name);
+	}
+}

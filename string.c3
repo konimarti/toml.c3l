@@ -16,7 +16,7 @@ fn bool escape_seq_char(char c) @inline
 		case 0x6E: // n
 		case 0x72: // r
 		case 0x74: // t
-		case 0x75: // u 4HEXDI>
+		case 0x75: // u 4HEXDIG
 		case 0x55: // U 8HEXDIG
 			return true;
 		default:
@@ -120,6 +120,7 @@ fn Object*? Parser.ml_basic_string(&self)
 		switch
 		{
 			case i < 3:
+				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
 				continue;
 			case i >= 3 && i < 6:
 				break LOOP;
@@ -200,8 +201,10 @@ fn void? Parser.mlb_content(&self, DString *d)
 			}
 			else
 			{
-				self.skip_ws()!;
-				while (is_newline(self.peek())) self.advance()!;
+				// non-escaped-terminal \ must be the last
+				// non-whitespace character
+				while (is_ws(self.peek())) self.advance()!;
+				if (!is_newline(self.peek())) return INVALID_LINE_ENDING_BACKSLASH?;
 				while (is_ws(self.peek()) || is_newline(self.peek())) self.advance()!;
 			}
 		}
@@ -310,6 +313,7 @@ fn Object*? Parser.ml_literal_string(&self)
 		switch
 		{
 			case i < 3:
+				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
 				continue;
 			case i >= 3 && i < 6:
 				break LOOP;
@@ -378,4 +382,3 @@ fn void? Parser.literal_string(&self)
 		self.advance()!;
 	}
 }
-
