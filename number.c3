@@ -94,9 +94,10 @@ fn Object*? Parser.number_or_datetime(&self) => @pool()
 }
 
 <*
- Valid numbers around underscore
+ Checks if the char is surrounded by two appropriate digits; applies to '_' and
+ '.'
 *>
-fn bool Parser.valid_underscore(&self, Accept is_valid = &ascii::is_digit) @local
+fn bool Parser.valid_surround(&self, char c, Accept is_valid = &ascii::is_digit) @local
 {
 	String str @noinit;
 	usz i, n;
@@ -105,7 +106,7 @@ fn bool Parser.valid_underscore(&self, Accept is_valid = &ascii::is_digit) @loca
 	i = self.current;
 	n = str.len;
 
-	assert(str[i] == '_');
+	assert(str[i] == c);
 
 	if (i < 1 || i + 1 >= n) return false;
 	if (is_valid(str[i - 1]) && is_valid(str[i + 1])) return true;
@@ -117,7 +118,7 @@ fn void? Parser.integer(&self, Token *tok)
 	switch (self.peek())
 	{
 		case '_':
-			if (!self.valid_underscore()) return INVALID_UNDERSCORE?;
+			if (!self.valid_surround(self.peek())) return INVALID_UNDERSCORE?;
 			self.advance()!;
 			self.integer(tok)!;
 		case '+':
@@ -182,13 +183,14 @@ fn void? Parser.parse_float(&self, Token *tok)
 	switch (self.peek())
 	{
 		case '_':
-			if (!self.valid_underscore()) return INVALID_UNDERSCORE?;
+			if (!self.valid_surround(self.peek())) return INVALID_UNDERSCORE?;
 			self.advance()!;
+		case '.':
 		case '+':
 		case '-':
 		case 'e':
-		case '.':
 		case '0'..'9':
+			if (self.peek() == '.' && !self.valid_surround(self.peek())) return INVALID_UNDERSCORE?;
 			tok.s.append_char(self.advance()!);
 		case 'n':
 			if (self.match("nan")!) tok.s.append_chars("nan");
@@ -235,7 +237,7 @@ fn void? Parser.parse_int(&self, DString s, Accept accept)
 			case accept(c):
 				s.append_char(self.advance()!);
 			case c == '_':
-				if (!self.valid_underscore(accept)) return INVALID_UNDERSCORE?;
+				if (!self.valid_surround(c, accept)) return INVALID_UNDERSCORE?;
 				self.advance()!;
 			default:
 				break LOOP;

@@ -475,6 +475,14 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/inline-table/trailing-comma",
 			.input = "abc = { abc = 123, }", // not permitted at end of inline table
 		},
+		{
+			.name = "invalid/float/trailing-point",
+			.input = "trailing-point = 1.",
+		},
+		{
+			.name = "invalid/float/trailing-point-min",
+			.input = "trailing-point = -1.",
+		},
 	};
 
 	foreach (t : invalid_tests)
