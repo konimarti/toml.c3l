@@ -371,6 +371,10 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/table/basic-out-of-range-unicode-escape-2",
 			.input =  `"\U00D80000"`,
 		},
+		{
+			.name = "invalid/spec/inline-table-2-0",
+			.input =  "[product]\ntype = { name = \"Nail\" }\ntype.edible = false",
+		},
 	};
 
 	foreach (t : invalid_tests)

@@ -5,6 +5,7 @@ import std::collections::object;
 import std::collections::list;
 
 alias StringList = List {String};
+alias TableList  = List {Object*};
 
 faultdef DUPLICATED_KEY,
 	DUPLICATED_TABLE,
@@ -26,10 +27,11 @@ faultdef DUPLICATED_KEY,
 	MISSING_TERMINAL_QUOTE,
 	MISSING_NEWLINE,
 	MULTILINE_STRING_TOO_SHORT,
-	MULTIPLE_ERRORS,
  	INVALID_LINE_ENDING_BACKSLASH,
 	INVALID_TABLE,
-	INVALID_ARRAY_TABLE;
+	INVALID_ARRAY_TABLE,
+	UNMUTABLE_INLINE_TABLES,
+	MULTIPLE_ERRORS;
 
 struct Parser
 {
@@ -39,6 +41,7 @@ struct Parser
 	int current;
 	int line;
 	Object* current_table;
+	TableList inline_tables;
 }
 
 fn Parser* Parser.init(&self, String s, Allocator allocator)
@@ -201,6 +204,9 @@ fn Object*? Parser.inline_table(&self)
 		return UNCLOSED_INLINE_TABLE?;
 	}
 
+	// Store inline table
+	self.inline_tables.push(table);
+
 	return table;
 }
 
@@ -279,6 +285,11 @@ fn void? Parser.insert(&self, Object *table, StringList k, Object* v)
 	{
 		self.error("key is already used; duplicated keys are not supported.");
 		return DUPLICATED_KEY?;
+	}
+	else if (self.inline_tables.contains(target))
+	{
+		self.error("keys cannot be added to inline tables outside the braces");
+		return UNMUTABLE_INLINE_TABLES?;
 	}
 	target.set(key, v);
 }
@@ -426,10 +437,13 @@ fn void? Parser.expression(&self, Object *obj)
 // toml = expression *( newline expression )
 // newline =  0x0A
 // newline =/ 0x0D.0x0A
-fn Object*? Parser.toml(&self)
+fn Object*? Parser.toml(&self) => @pool()
 {
 	Object* obj = object::new_obj(self.allocator);
 	self.current_table = obj;
+
+	self.inline_tables.clear();
+	self.inline_tables.tinit();
 
 	fault last_error;
 	int max_lines = int.max;
