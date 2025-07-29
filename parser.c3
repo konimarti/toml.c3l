@@ -24,6 +24,7 @@ faultdef DUPLICATED_KEY,
 	INVALID_ARRAY_TABLE,
 	INVALID_KEY,
  	INVALID_LEADING_ZERO,
+	INVALID_COMMA,
 	UNCLOSED_INLINE_TABLE,
 	UNCLOSED_STD_TABLE,
 	UNCLOSED_ARRAY_TABLE,
@@ -195,6 +196,8 @@ fn Object*? Parser.inline_table(&self)
 	while LOOP: (1)
 	{
 		self.skip_ws()!;
+
+		if (self.peek() == '}') return INVALID_COMMA?;
 
 		self.keyval(table)!;
 

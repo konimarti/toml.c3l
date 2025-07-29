@@ -471,6 +471,10 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/integer/leading-zero-sign-3",
 			.input = "leading-zero-sign-1 = +0_1",
 		},
+		{
+			.name = "invalid/inline-table/trailing-comma",
+			.input = "abc = { abc = 123, }", // not permitted at end of inline table
+		},
 	};
 
 	foreach (t : invalid_tests)
