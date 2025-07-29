@@ -21,14 +21,18 @@ fn Object*? Parser.array(&self)
 	{
 		self.skip_ws_comment_newline()!;
 
-		// array-close
 		if (self.must(']')) break LOOP;
 
 		arr.push_object(self.value()!);
 
 		self.skip_ws_comment_newline()!;
 
-		self.must(',');
+		switch (self.peek())
+		{
+			case ',': self.advance()!; continue;
+			case ']': self.advance()!; break LOOP;
+			default: return INVALID_ARRAY?;
+		}
 	}
 
 	return arr;

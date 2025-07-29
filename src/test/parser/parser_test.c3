@@ -495,6 +495,10 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/datetime/offset-overflow-hour",
 			.input = "d = 1985-06-18 17:04:07+12:61", // off-min: 0-60
 		},
+		{
+			.name = "invalid/array/no-comma-2",
+			.input = "no-comma = [ 1 2 3 ]",
+		},
 	};
 
 	foreach (t : invalid_tests)
