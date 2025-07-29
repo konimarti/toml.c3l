@@ -93,13 +93,12 @@ fn Object*? Parser.string(&self)
 // ml-basic-string-delim = 3quotation-mark
 // ml-basic-body = *mlb-content *( mlb-quotes 1*mlb-content ) [ mlb-quotes ]
 // mlb-quotes = 1*2quotation-mark
-fn Object*? Parser.ml_basic_string(&self)
+fn Object*? Parser.ml_basic_string(&self) => @pool()
 {
 	// ml-basic-string-delim has been read at this point.
 
-	DString d;
-	d.init(self.allocator, 16);
-	defer d.free();
+	DString buf;
+	buf.tinit(16);
 
 	// [ newline ]
 	if (is_newline(self.peek())) self.advance()!;
@@ -107,37 +106,36 @@ fn Object*? Parser.ml_basic_string(&self)
 	// ml-basic-body
 	while LOOP: (1)
 	{
-		self.mlb_content(&d)!;
+		self.mlb_content(&buf)!;
 
 		// maximum much for quotes, but cannot have more than 5
 		// terminal quotes
-		int i = 0;
+		int len = 0;
 		while (!self.at_end() && self.must('"'))
 		{
-			i++;
-			d.append_char('"');
+			buf.append_char('"');
+			len++;
 		}
 		switch
 		{
-			case i < 3:
-				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
-				continue;
-			case i >= 3 && i < 6:
-				break LOOP;
-			case i >= 6:
+			case len > 5:
 				self.error("terminal quote sequence is invalid; there are too many..");
 				return parser::INVALID_TERMINAL_QUOTES?;
+			case len >= 3:
+				break LOOP;
+			default:
+				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
 		}
 	}
 
 	// must have at least 6 chars (""""""") in smallest ml string
-	if (d.len() <= 3)
+	if (buf.len() <= 3)
 	{
 		self.error("multi-line string is not long enough; did add three quotes on both sides?");
 		return parser::MULTILINE_STRING_TOO_SHORT?;
 	}
 
-	return object::new_string(d.str_view().strip_end(`"""`), self.allocator);
+	return object::new_string(buf.str_view().strip_end(`"""`), self.allocator);
 }
 
 // mlb-content = mlb-char / newline / mlb-escaped-nl
@@ -145,7 +143,7 @@ fn Object*? Parser.ml_basic_string(&self)
 // mlb-unescaped = wschar / 0x21 / 0x23 - 0x5B / 0x5D - 0x7E / non-ascii
 // mlb-escaped-nl = escape ws newline *( wschar / newline )
 // TODO: non-ascii
-fn void? Parser.mlb_content(&self, DString *d)
+fn void? Parser.mlb_content(&self, DString *buf)
 {
 	// mlb-content = mlb-char / newline / mlb-escaped-nl
 	char c;
@@ -155,13 +153,13 @@ fn void? Parser.mlb_content(&self, DString *d)
 
 		// mlb-char = escaped
 		if (is_ws(c) || c == 0x21 || (c >= 0x23 && c <= 0x5B) || (c >= 0x5D && c <= 0x7E)) {
-			d.append_char(self.advance()!);
+			buf.append_char(self.advance()!);
 			continue;
 		}
 
 		// newline
 		if (is_newline(c)) {
-			d.append_char(self.advance()!);
+			buf.append_char(self.advance()!);
 			continue;
 		}
 
@@ -172,23 +170,25 @@ fn void? Parser.mlb_content(&self, DString *d)
 			if (escape_seq_char(self.peek()))
 			{
 				char u;
-				d.append_char(ESCAPE);
-				d.append_char(u = self.advance()!);
+				int n;
 
-				int n = 0;
+				buf.append_char(ESCAPE);
+
+				u = self.advance()!;
+				buf.append_char(u);
+
+				n = 0;
 				switch (u)
 				{
-					case 0x75:
-						n = 4;
-					case 0x55:
-						n = 8;
+					case 0x75: n = 4; // \u
+					case 0x55: n = 8; // \U
 				}
 
-				for (int i = 0; i < n; i++)
+				while (n--)
 				{
 					if (self.peek().is_xdigit())
 					{
-						d.append_char(self.advance()!);
+						buf.append_char(self.advance()!);
 					}
 					else
 					{
@@ -239,18 +239,17 @@ fn void? Parser.basic_string(&self)
 			if (escape_seq_char(self.peek()))
 			{
 				char u;
-				u = self.advance()!;
+				int n;
 
-				int n = 0;
+				u = self.advance()!;
+				n = 0;
 				switch (u)
 				{
-					case 0x75:
-						n = 4;
-					case 0x55:
-						n = 8;
+					case 0x75: n = 4;
+					case 0x55: n = 8;
 				}
 
-				for (int i = 0; i < n; i++)
+				while (n--)
 				{
 					if (self.peek().is_xdigit())
 					{
@@ -286,13 +285,12 @@ fn void? Parser.basic_string(&self)
 //			ml-literal-string-delim
 // ml-literal-string-delim = 3apostrophe
 // ml-literal-body = "mll-content *( mll-quotes 1*mll-content ) [ mll-quotes ]
-fn Object*? Parser.ml_literal_string(&self)
+fn Object*? Parser.ml_literal_string(&self) => @pool()
 {
 	// ml-literal-string-delim has been read at this point.
 
-	DString d;
-	d.init(self.allocator, 16);
-	defer d.free();
+	DString buf;
+	buf.tinit(16);
 
 	// [ newline ]
 	if (is_newline(self.peek())) self.advance()!;
@@ -300,44 +298,43 @@ fn Object*? Parser.ml_literal_string(&self)
 	// ml-literal-body
 	while LOOP: (1)
 	{
-		self.mll_content(&d)!;
+		self.mll_content(&buf)!;
 
 		// maximum much for quotes, but cannot have more than 5
 		// terminal quotes
-		int i = 0;
+		int len = 0;
 		while (!self.at_end() && self.must('\''))
 		{
-			i++;
-			d.append_char('\'');
+			buf.append_char('\'');
+			len++;
 		}
 		switch
 		{
-			case i < 3:
-				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
-				continue;
-			case i >= 3 && i < 6:
-				break LOOP;
-			case i >= 6:
+			case len > 5:
 				self.error("terminal apostrophe sequence is invalid; there are too many..");
 				return parser::INVALID_TERMINAL_QUOTES?;
+			case len >= 3:
+				break LOOP;
+			default:
+				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
 		}
 	}
 
 	// must have at least 3 chars (''') in smallest ml string
-	if (d.len() <= 3)
+	if (buf.len() <= 3)
 	{
 		self.error("multi-line string is not long enough; did add three apostrophes on both sides?");
 		return parser::MULTILINE_STRING_TOO_SHORT?;
 	}
 
-	return object::new_string(d.str_view().strip_end(`'''`), self.allocator);
+	return object::new_string(buf.str_view().strip_end(`'''`), self.allocator);
 }
 
 // mll-content = mll-char / newline
 // mll-char = 0x09 / 0x20 - 0x26 / 0x28 - 0x7E / non-ascci
 // mll-quotes = 1*2apstrophe
 // TODO: non-ascii
-fn void? Parser.mll_content(&self, DString *d)
+fn void? Parser.mll_content(&self, DString *buf)
 {
 	// mll-content = mll-char / newline
 	char c;
@@ -347,13 +344,13 @@ fn void? Parser.mll_content(&self, DString *d)
 
 		// mll-char
 		if (c == 0x09 || (c >= 0x20 && c <= 0x26) || (c >= 0x28 && c <= 0x7E)) {
-			d.append_char(self.advance()!);
+			buf.append_char(self.advance()!);
 			continue;
 		}
 
 		// newline
 		if (is_newline(c)) {
-			d.append_char(self.advance()!);
+			buf.append_char(self.advance()!);
 			continue;
 		}
 
