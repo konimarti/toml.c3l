@@ -476,6 +476,10 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.input = "abc = { abc = 123, }", // not permitted at end of inline table
 		},
 		{
+			.name = "invalid/inline-table/double-comma",
+			.input = "t = { x=3,,y=4 }", // not permitted at end of inline table
+		},
+		{
 			.name = "invalid/float/trailing-point",
 			.input = "trailing-point = 1.",
 		},

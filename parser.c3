@@ -197,7 +197,12 @@ fn Object*? Parser.inline_table(&self)
 	{
 		self.skip_ws()!;
 
-		if (self.peek() == '}') return INVALID_COMMA?;
+		switch (self.peek())
+		{
+		case ',':
+		case '}':
+			return INVALID_COMMA?;
+		}
 
 		self.keyval(table)!;
 
