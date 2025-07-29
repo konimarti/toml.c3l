@@ -22,7 +22,8 @@ struct TomlDateTime (Printable)
 	int year, month, day;
 	int hour, minute, second;
 	int nanosecond;
-	int offset_minutes;
+	int offset_hour, offset_minute;
+	int offset_sign;
 	bool tz_utc;
 }
 
@@ -31,6 +32,7 @@ const TIME_FMT @local      = "%02d:%02d:%02d";
 const OFFSET_FMT @local    = "%02d:%02d";
 const DATE_TIME_FMT @local = "%04d-%02d-%02d %02d:%02d:%02d";
 
+fn int TomlDateTime.offset_seconds(&self) => self.offset_hour * 3600 + self.offset_minute * 60;
 fn usz? TomlDateTime.to_format(&self, Formatter* f) @dynamic
 {
 	usz n;
@@ -50,10 +52,9 @@ fn usz? TomlDateTime.to_format(&self, Formatter* f) @dynamic
 			}
 			else
 			{
-				int off_secs = self.offset_minutes * 60;;
-				n += f.print(off_secs < 0 ? "-" : "+")!;
-				if (off_secs < 0) off_secs *= -1;
-				n += f.printf(OFFSET_FMT, off_secs / 3600, off_secs % 60)!;
+				int off_secs = self.offset_seconds();
+				n += f.print(self.offset_sign < 0 ? "-" : "+")!;
+				n += f.printf(OFFSET_FMT, self.offset_hour, self.offset_minute)!;
 			}
 		case TIME_ONLY:
 			n += f.printf(TIME_FMT, self.hour, self.minute, self.second)!;
@@ -73,6 +74,10 @@ fn bool TomlDateTime.valid_ranges(&self)
 			if (self.year < 0 || self.year > 9999) return false;
 			if (self.month < 1 || self.month > 12) return false;
 			if (self.day < 1 || self.day > 31) return false;
+
+			if (self.offset_hour < 0 || self.offset_hour > 24) return false;
+			if (self.offset_minute < 0 || self.offset_minute > 60) return false;
+
 			nextcase;
 		case TIME_ONLY:
 			if (self.hour < 0 || self.hour > 23) return false;
@@ -112,7 +117,7 @@ fn DateTime? TomlDateTime.date_time(&self)
 
 	if (self.kind == OFFSET_DATE_TIME)
 	{
-		dt = dt.to_gmt_offset(self.offset_minutes * 60).date_time;
+		dt = dt.to_gmt_offset(self.offset_sign * self.offset_seconds()).date_time;
 	}
 
 	return dt;
@@ -229,13 +234,11 @@ fn void? parse_time(Lexer *lexer, TomlDateTime *dt)
 		case MINUS:
 			dt.kind = OFFSET_DATE_TIME;
 
-			int hour_off, min_off;
-			lexer.expect(NUMBER, &hour_off, 2)!;
+			lexer.expect(NUMBER, &dt.offset_hour, 2)!;
 			lexer.expect(COLON)!;
-			lexer.expect(NUMBER, &min_off, 2)!;
+			lexer.expect(NUMBER, &dt.offset_minute, 2)!;
 
-			dt.offset_minutes = hour_off * 60 + min_off;
-			if (tok.type == MINUS) dt.offset_minutes *= -1;
+			dt.offset_sign = tok.type == MINUS ? -1 : 1;
 		default:
 			// nothing to do
 	}

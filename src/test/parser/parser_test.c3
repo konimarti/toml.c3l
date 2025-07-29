@@ -487,6 +487,14 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/float/trailing-point-min",
 			.input = "trailing-point = -1.",
 		},
+		{
+			.name = "invalid/datetime/offset-overflow-hour",
+			.input = "d = 1985-06-18 17:04:07+25:00", // off-hour: 0-24
+		},
+		{
+			.name = "invalid/datetime/offset-overflow-hour",
+			.input = "d = 1985-06-18 17:04:07+12:61", // off-min: 0-60
+		},
 	};
 
 	foreach (t : invalid_tests)
