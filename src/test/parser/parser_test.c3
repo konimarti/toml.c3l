@@ -513,6 +513,10 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/inline-table/duplicate-key-3",
 			.input = "tbl = { fruit = { apple.color = \"red\" }, fruit.apple.texture = { smooth = true } }",
 		},
+		{
+			.name = "invalid/array/tables-1",
+			.input = "fruit = []\n [[fruit]]",
+		},
 
 	};
 

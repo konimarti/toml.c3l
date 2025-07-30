@@ -53,6 +53,7 @@ struct Parser
 	int line;
 	Object* current_table;
 	TableList inline_tables;
+	TableList array_of_tables;
 }
 
 fn Parser* Parser.init(&self, String s, Allocator allocator)
@@ -384,6 +385,7 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool crea
 	}
 	if (create_as_array) {
 		if (!cur.is_indexable()) return INVALID_ARRAY_TABLE?;
+		if (cur.get_len() == 0) self.array_of_tables.push(cur);
 		cur.push_object(object::new_obj(self.allocator));
 	}
 	if (cur.is_array()) {
@@ -430,6 +432,9 @@ fn Object*? Parser.table(&self, Object *obj)
 			// Array table already exists and now check that it
 			// actually is an array (is_indexable())
 			if (!tab.is_array()) return INVALID_ARRAY_TABLE?;
+
+			// Array should be in the array_of_tables list
+			if (!self.array_of_tables.contains(tab)) return INVALID_ARRAY_TABLE?;
 		}
 		else
 		{
@@ -489,6 +494,9 @@ fn Object*? Parser.toml(&self) => @pool()
 
 	self.inline_tables.clear();
 	self.inline_tables.tinit();
+
+	self.array_of_tables.clear();
+	self.array_of_tables.tinit();
 
 	fault last_error;
 	int max_lines = int.max;
