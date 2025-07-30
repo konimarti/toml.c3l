@@ -519,12 +519,8 @@ fn Object*? Parser.toml(&self) => @pool()
 		{
 			if (err == io::EOF) break LOOP;
 
-			if (last_error)
-			{
-				last_error = MULTIPLE_ERRORS;
-			} else {
-				last_error = err;
-			}
+			self.error(string::tformat("%s", err));
+			last_error = last_error ? MULTIPLE_ERRORS : err;
 
 			// synchronize parser after error by moving to the next
 			// newline.
@@ -542,15 +538,18 @@ fn Object*? Parser.toml(&self) => @pool()
 		if (!self.must('\n'))
 		{
 			if (self.at_end()) break LOOP;
+			io::printfn("remaining: %s", (String)self.s[self.current ..]);
 			self.error("Missing Newline after an expression");
-			last_error = MISSING_NEWLINE;
-			break LOOP;
+			return MISSING_NEWLINE?;
 		}
 
 		self.line += 1;
 	}
+
+	// If en error has been encountered, return it
 	if (last_error) return last_error?;
 
+	// Treat an empty table as an error
 	if (obj.is_keyable() && obj.map.len() == 0) return INVALID_TABLE?;
 
 	return obj;

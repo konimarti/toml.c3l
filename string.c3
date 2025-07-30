@@ -215,7 +215,8 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				{
 					if (self.peek().is_xdigit())
 					{
-						buf.append_char(self.advance()!);
+						// buf.append_char(self.advance()!);
+						self.advance()!;
 					}
 					else
 					{
@@ -224,7 +225,14 @@ fn void? Parser.mlb_content(&self, DString *buf)
 					}
 				}
 
-				validate_unicode(self.s[start:n])!;
+				// Parse Unicode escape sequence into unicode codepoint
+				uint codepoint = string::tformat("0x%s", self.s[start:n]).to_int()!;
+
+				// Verify that it is a scalar Unicode codepoint
+				if (is_scalar_unicode(codepoint)) return INVALID_UNICODE?;
+
+				// Add codepoint to buffer (by which is encoded to utf8)
+				buf.append_char32(codepoint);
 
 			}
 			else
@@ -497,22 +505,3 @@ fn bool is_scalar_unicode(Char32 u) @inline => u <= 0xD7FF || (u >= 0xE000 && u 
  non-ascii = 0x80-D7FF / 0xE000-10FFFF
 *>
 fn bool is_non_ascii(Char32 u) @inline => u >= 0x80 && is_scalar_unicode(u);
-
-<*
- Validate escaped (encoded) unicode values (\u and \U).
-*>
-fn void? validate_unicode(String hex) => @pool()
-{
-	// Decode from hex
-	char[] decoded = hex::tdecode(hex)!;
-
-	// Trim any leading zeros
-	while (decoded.len && decoded[0] == 0) decoded = decoded[1 .. ];
-
-	// Convert to unicode (uint)
-	usz nbytes = decoded.len;
-	Char32 code_point = conv::utf8_to_char32(decoded, &nbytes)!;
-
-	// Check that codepoint is a scalar unicode
-	if (!is_scalar_unicode(code_point)) return parser::INVALID_SCALAR_UNICODE?;
-}
