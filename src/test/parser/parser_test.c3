@@ -340,7 +340,7 @@ fn void parser_value_float() @test
 	}
 }
 
-struct InvalidToml
+struct TomlTestCase
 {
 	String name;
 	String input;
@@ -348,7 +348,7 @@ struct InvalidToml
 
 fn void parser_toml_test_invalid() @test => @pool()
 {
-	InvalidToml[*] invalid_tests = {
+	TomlTestCase[*] invalid_tests = {
 		{
 			.name = "invalid/table/overwrite-with-deep-table",
 			.input = "a=1\n[a.b.c.d]",
@@ -517,7 +517,10 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/array/tables-1",
 			.input = "fruit = []\n [[fruit]]",
 		},
-
+		{
+			.name = "invalid/table/duplicate",
+			.input = "[a]\nb = 1\n\n[a]\nc = 2",
+		},
 	};
 
 	foreach (t : invalid_tests)
@@ -525,5 +528,26 @@ fn void parser_toml_test_invalid() @test => @pool()
 		toml::parser::Parser p;
 		p.init(t.input, tmem);
 		assert(!@ok(p.toml()), "unittest '%s' should fail.", t.name);
+	}
+}
+
+fn void parser_toml_test_valid() @test => @pool()
+{
+	TomlTestCase[*] valid_tests = {
+		{
+			.name = "dummy",
+			.input = "a=1",
+		},
+		{
+			.name = "valid/table/without-super-with-values",
+			.input = "[x.y.z.w]\na = 1\n[x]\nc=3",
+		},
+	};
+
+	foreach (t : valid_tests)
+	{
+		toml::parser::Parser p;
+		p.init(t.input, tmem);
+		assert(@ok(p.toml()), "unittest '%s' should pass.", t.name);
 	}
 }
