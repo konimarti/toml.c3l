@@ -29,6 +29,7 @@ faultdef DUPLICATED_KEY,
 	INVALID_COMMA,
 	INVALID_LITERAL,
 	INVALID_STRING,
+	INVALID_NEWLINE,
 	UNCLOSED_INLINE_TABLE,
 	UNCLOSED_STD_TABLE,
 	UNCLOSED_ARRAY_TABLE,
@@ -87,7 +88,14 @@ fn void Parser.error(&self, String msg)
 
 fn bool is_ws(char c) => (c == 0x20 || c == 0x09);
 
-fn bool is_newline(char c) => (c == 0x0A || c == 0x0D);
+
+// newline =  x0A     ; LF
+// newline =/ x0D.0A  ; CRLF
+// fn bool is_newline(char c) => (c == 0x0A || c == 0x0D);
+fn bool is_lf(char c) => c == 0x0A;
+
+// if CR, then a LF must follow!
+fn bool is_cr(char c) => c == 0x0D;
 
 // incomplete implementation of non_ascii; you still not to verify that the
 // actual codepoint is a scalar unicode
@@ -147,7 +155,11 @@ fn void? Parser.skip_ws_comment_newline(&self)
 				self.skip_ws()!;
 			case c == '#':
 				self.skip_comment()!;
-			case is_newline(c):
+			case is_lf(c):
+				self.advance()!;
+			case is_cr(c):
+				self.advance()!;
+				if (!is_lf(self.peek())) return INVALID_NEWLINE?;
 				self.advance()!;
 			default:
 				break LOOP;

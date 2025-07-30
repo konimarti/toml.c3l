@@ -102,7 +102,16 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 	buf.tinit(16);
 
 	// [ newline ]
-	if (is_newline(self.peek())) self.advance()!;
+	if (is_lf(self.peek()))
+	{
+		self.advance()!;
+	}
+	else if (is_cr(self.peek()))
+	{
+		self.advance()!;
+		if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+		self.advance()!;
+	}
 
 	// ml-basic-body
 	while LOOP: (1)
@@ -167,7 +176,15 @@ fn void? Parser.mlb_content(&self, DString *buf)
 		}
 
 		// newline
-		if (is_newline(c)) {
+		if (is_lf(c))
+		{
+			buf.append_char(self.advance()!);
+			continue;
+		}
+		else if (is_cr(c))
+		{
+			buf.append_char(self.advance()!);
+			if (!is_lf(self.peek())) return INVALID_NEWLINE?;
 			buf.append_char(self.advance()!);
 			continue;
 		}
@@ -215,8 +232,16 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				// non-escaped-terminal \ must be the last
 				// non-whitespace character
 				while (is_ws(self.peek())) self.advance()!;
-				if (!is_newline(self.peek())) return INVALID_LINE_ENDING_BACKSLASH?;
-				while (is_ws(self.peek()) || is_newline(self.peek())) self.advance()!;
+				if (!is_lf(self.peek()) && !is_cr(self.peek())) return INVALID_LINE_ENDING_BACKSLASH?;
+				while (is_ws(self.peek()) || is_lf(self.peek()) || is_cr(self.peek()))
+				{
+					if (is_cr(self.peek()))
+					{
+						self.advance()!;
+						if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+					}
+					self.advance()!;
+				}
 
 			}
 
@@ -322,7 +347,16 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 	buf.tinit(16);
 
 	// [ newline ]
-	if (is_newline(self.peek())) self.advance()!;
+	if (is_lf(self.peek()))
+	{
+		self.advance()!;
+	}
+	else if (is_cr(self.peek()))
+	{
+		self.advance()!;
+		if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+		self.advance()!;
+	}
 
 	// ml-literal-body
 	while LOOP: (1)
@@ -384,10 +418,19 @@ fn void? Parser.mll_content(&self, DString *buf)
 			buf.append_char32(codepoint);
 			continue;
 		}
-		else if (is_newline(c)) {
+		else if (is_lf(c))
+		{
 			buf.append_char(self.advance()!);
 			continue;
 		}
+		else if (is_cr(c))
+		{
+			buf.append_char(self.advance()!);
+			if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+			buf.append_char(self.advance()!);
+			continue;
+		}
+
 		else if (c == '\'') {
 			break LOOP;;
 		}
