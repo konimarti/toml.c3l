@@ -17,6 +17,7 @@ faultdef DUPLICATED_KEY,
 	INVALID_ESCAPE_SEQUENCE,
 	INVALID_TOKEN_TYPE,
 	INVALID_UNICODE,
+	INVALID_NON_ASCII,
 	INVALID_UNDERSCORE,
 	INVALID_SCALAR_UNICODE,
  	INVALID_LINE_ENDING_BACKSLASH,
@@ -26,6 +27,8 @@ faultdef DUPLICATED_KEY,
 	INVALID_KEY,
  	INVALID_LEADING_ZERO,
 	INVALID_COMMA,
+	INVALID_LITERAL,
+	INVALID_STRING,
 	UNCLOSED_INLINE_TABLE,
 	UNCLOSED_STD_TABLE,
 	UNCLOSED_ARRAY_TABLE,
@@ -85,6 +88,8 @@ fn bool is_ws(char c) => (c == 0x20 || c == 0x09);
 
 fn bool is_newline(char c) => (c == 0x0A || c == 0x0D);
 
+// incomplete implementation of non_ascii; you still not to verify that the
+// actual codepoint is a scalar unicode
 fn bool non_ascii(char c) => (c >= 0x80);
 
 fn bool non_eol(char c)
@@ -111,7 +116,22 @@ fn void? Parser.skip_ws(&self)
 fn void? Parser.skip_comment(&self)
 {
 	if (!self.must('#')) return;
-	while (non_eol(self.peek())) self.advance()!;
+
+	char c;
+	while (non_eol(c = self.peek()))
+	{
+		// non-ascii
+		if (is_unicode(c))
+		{
+			Char32 codepoint = self.scan_unicode()!;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+		}
+		// non-eol
+		else
+		{
+			self.advance()!;
+		}
+	}
 }
 
 // sw-comment-newline = *( wschar / [comment ] newline )

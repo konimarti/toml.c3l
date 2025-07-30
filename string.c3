@@ -1,6 +1,6 @@
 module toml::parser;
 
-import std::io;
+import std::io, std::math;
 import std::encoding::hex;
 import std::collections::object;
 
@@ -142,7 +142,7 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 // mlb-char = mlb-unescaped / escaped
 // mlb-unescaped = wschar / 0x21 / 0x23 - 0x5B / 0x5D - 0x7E / non-ascii
 // mlb-escaped-nl = escape ws newline *( wschar / newline )
-// TODO: non-ascii
+// non-ascii = 0x80-D7FF / 0xE000-10FFFF
 fn void? Parser.mlb_content(&self, DString *buf)
 {
 	// mlb-content = mlb-char / newline / mlb-escaped-nl
@@ -151,9 +151,18 @@ fn void? Parser.mlb_content(&self, DString *buf)
 	{
 		c = self.peek();
 
-		// mlb-char = escaped
+		// mlb-unescaped = wschar / 0x21 / 0x23 - 0x5B / 0x5D - 0x7E
 		if (is_ws(c) || c == 0x21 || (c >= 0x23 && c <= 0x5B) || (c >= 0x5D && c <= 0x7E)) {
+
 			buf.append_char(self.advance()!);
+			continue;
+		}
+		// mlb-unescaped = non-ascii
+		else if (is_unicode(c))
+		{
+			Char32 codepoint = self.scan_unicode()!;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			buf.append_char32(codepoint);
 			continue;
 		}
 
@@ -214,7 +223,13 @@ fn void? Parser.mlb_content(&self, DString *buf)
 			continue;
 		}
 
-		break LOOP;
+		if (c == '"') {
+			break LOOP;;
+		}
+		else
+		{
+			return INVALID_STRING?;
+		}
 	}
 }
 
@@ -225,21 +240,29 @@ fn void? Parser.mlb_content(&self, DString *buf)
 // escaped = escape escape-seq-char
 // escape = 0x5C ; \
 // escape-seq-char = 0x22 / 0x5C / 0x62 / 0x66 / 0x6E / 0x72 / 0x72 / unicode??
-// TODO: non-ascii
+// non-ascii = 0x80-D7FF / 0xE000-10FFFF
 fn void? Parser.basic_string(&self)
 {
 	// beginning quote is already consumed.
 
 	while LOOP: (1)
 	{
-		// basic-unescaped
+		// basic-unescaped = wschar / 0x21 / 0x23 - 0x5B / 0x5D - 0x-7E
 		if (basic_unescaped(self.peek()))
 		{
 			self.advance()!;
 			continue;
 		}
 
-		// escaped
+		// basic-unescaped = non-ascii
+		if (is_unicode(self.peek()))
+		{
+			Char32 codepoint = self.scan_unicode()!;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			continue;
+		}
+
+		// escaped = escape escape-seq-char
 		if (self.must(ESCAPE))
 		{
 			if (escape_seq_char(self.peek()))
@@ -280,13 +303,10 @@ fn void? Parser.basic_string(&self)
 			}
 		}
 
-		if (!self.must('"'))
-		{
-			self.error("missing closing quote \"");
-			return parser::UNCLOSED_QUOTE?;
-		}
+		if (self.must('"')) break LOOP;
 
-		break LOOP;
+		self.error("missing closing quote \"");
+		return parser::UNCLOSED_QUOTE?;
 	}
 }
 
@@ -340,9 +360,9 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 }
 
 // mll-content = mll-char / newline
-// mll-char = 0x09 / 0x20 - 0x26 / 0x28 - 0x7E / non-ascci
+// mll-char = 0x09 / 0x20 - 0x26 / 0x28 - 0x7E / non-ascii
 // mll-quotes = 1*2apstrophe
-// TODO: non-ascii
+// non-ascii = 0x80-D7FF / 0xE000-10FFFF
 fn void? Parser.mll_content(&self, DString *buf)
 {
 	// mll-content = mll-char / newline
@@ -352,32 +372,53 @@ fn void? Parser.mll_content(&self, DString *buf)
 		c = self.peek();
 
 		// mll-char
-		if (c == 0x09 || (c >= 0x20 && c <= 0x26) || (c >= 0x28 && c <= 0x7E)) {
+		if (c == 0x09 || (c >= 0x20 && c <= 0x26) || (c >= 0x28 && c <= 0x7E))
+		{
 			buf.append_char(self.advance()!);
 			continue;
 		}
-
-		// newline
-		if (is_newline(c)) {
+		else if (is_unicode(c))
+		{
+			Char32 codepoint = self.scan_unicode()!;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			buf.append_char32(codepoint);
+			continue;
+		}
+		else if (is_newline(c)) {
 			buf.append_char(self.advance()!);
 			continue;
 		}
-
-		break LOOP;
+		else if (c == '\'') {
+			break LOOP;;
+		}
+		else
+		{
+			return INVALID_LITERAL?;
+		}
 	}
 }
 
 // literal-string = apostrophe *literal-char apostrophe
 // literal-char = 0x09 / 0x20 - 0x26 / 0x28 - 0x7E / non-ascii
-// TODO: non-ascii
+// non-ascii = 0x80-D7FF / 0xE000-10FFFF
 fn void? Parser.literal_string(&self)
 {
 	// beginning apostrophe is already consumed.
+	char c;
 
 	while (1)
 	{
-		if (!literal_char(self.peek()))
+		c = self.peek();
+
+		if (literal_char(c))
 		{
+			self.advance()!;
+		}
+		else if (is_unicode(c))
+		{
+			Char32 codepoint = self.scan_unicode()!;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+		} else {
 			if (!self.must('\''))
 			{
 				self.error("missing closing apostrophe '");
@@ -385,21 +426,38 @@ fn void? Parser.literal_string(&self)
 			}
 			return;
 		}
-		self.advance()!;
 	}
 }
 
-<*
- Return true if u is between 0000 to D7FF
- or between E000 to 10FFFF
-*>
-fn bool is_scalar_unicode(Char32 u)
+fn Char32? Parser.scan_unicode(&self)
 {
-	if ((u > 0x0000 && u <= 0xD7FF) ||
-		(u > 0xE000 && u <= 0x10FFFF)) return true;
-	return false;
+	usz len = math::min(4, (int)(self.s.len - self.current));
+	Char32 codepoint = conv::utf8_to_char32(&self.s[self.current], &len)!;
+	while (len--) self.advance()!;
+	return codepoint;
 }
 
+<*
+ Check if top two bits are set
+ With 0xc0 (b11_00_00_00) we check if it is a starting byte for a multi-byte utf8 sequence
+ 0b10_ would be continuation byte
+ 0b0*_ is a regular ASCII
+*>
+fn bool is_unicode(char c) @inline => (c & 0xc0) == 0xc0;
+
+<*
+ scalar-unicode = 0x0000-D7FF / 0xE000-10FFFF
+*>
+fn bool is_scalar_unicode(Char32 u) @inline => u <= 0xD7FF || (u >= 0xE000 && u <= 0x10FFFF);
+
+<*
+ non-ascii = 0x80-D7FF / 0xE000-10FFFF
+*>
+fn bool is_non_ascii(Char32 u) @inline => u >= 0x80 && is_scalar_unicode(u);
+
+<*
+ Validate escaped (encoded) unicode values (\u and \U).
+*>
 fn void? validate_unicode(String hex) => @pool()
 {
 	// Decode from hex
