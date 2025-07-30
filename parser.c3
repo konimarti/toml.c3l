@@ -101,9 +101,11 @@ fn bool is_cr(char c) => c == 0x0D;
 // actual codepoint is a scalar unicode
 fn bool non_ascii(char c) => (c >= 0x80);
 
+// Note that the specs says that 0x7f should be allowed as non-eol; but the
+// tomltest suite records it as invalid; follow the testsuite.
 fn bool non_eol(char c)
 {
-	return (c == 0x09 || (c >= 0x20 && c <= 0x7F) || non_ascii(c));
+	return (c == 0x09 || (c >= 0x20 && c < 0x7F) || non_ascii(c));
 }
 
 fn bool is_unquoted_key(char c)
