@@ -3,6 +3,8 @@ module toml;
 import std::io;
 import std::collections::object @public;
 
+import toml::time;
+
 struct TomlData (Printable)
 {
 	Object* table;
@@ -22,7 +24,10 @@ fn String tescape_json(String s)
 	DString buf = dstring::temp();
 	foreach (c : s)
 	{
-		if (c == '"') buf.append_char('\\');
+		switch (c)
+		{
+		case '"': buf.append_char('\\');
+		}
 		buf.append_char(c);
 	}
 	return buf.str_view();
@@ -37,9 +42,15 @@ fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 		case void*:
 			return formatter.printf("null")!;
 		case String:
-			if (try time::parse(self.s))
+			if (try toml_date_time = time::parse(self.s))
 			{
-				return formatter.printf(`{"type":"datetime","value":"%s"}`, self.s)!;
+				switch (toml_date_time.kind)
+				{
+				case DATE_ONLY: return formatter.printf(`{"type":"date-local","value":"%s"}`, self.s)!;
+				case TIME_ONLY: return formatter.printf(`{"type":"time-local","value":"%s"}`, self.s)!;
+				case LOCAL_DATE_TIME: return formatter.printf(`{"type":"datetime-local","value":"%s"}`, self.s)!;
+				case OFFSET_DATE_TIME: return formatter.printf(`{"type":"datetime","value":"%s"}`, self.s)!;
+				}
 			}
 			else
 			{
