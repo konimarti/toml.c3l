@@ -112,6 +112,16 @@ fn void parser_value_string() @test
 			.input = `'''hello\nworld'''''`,
 			.want = "hello\\nworld''",
 		},
+		{
+			.name = "empty multiline literal string",
+			.input = `''''''`,
+			.want = "",
+		},
+		{
+			.name = "empty multiline basic string",
+			.input = `""""""`,
+			.want = "",
+		},
 	};
 
 	foreach (i, t : tests)

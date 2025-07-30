@@ -109,8 +109,7 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 	{
 		self.mlb_content(&buf)!;
 
-		// maximum much for quotes, but cannot have more than 5
-		// terminal quotes
+		// Maximum munch for quotes, but cannot have more than 5
 		int len = 0;
 		while (!self.at_end() && self.must('"'))
 		{
@@ -130,7 +129,7 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 	}
 
 	// must have at least 6 chars (""""""") in smallest ml string
-	if (buf.len() <= 3)
+	if (buf.len() < 3)
 	{
 		self.error("multi-line string is not long enough; did add three quotes on both sides?");
 		return parser::MULTILINE_STRING_TOO_SHORT?;
@@ -201,7 +200,6 @@ fn void? Parser.mlb_content(&self, DString *buf)
 
 				validate_unicode(self.s[start:n])!;
 
-				continue;
 			}
 			else
 			{
@@ -210,7 +208,10 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				while (is_ws(self.peek())) self.advance()!;
 				if (!is_newline(self.peek())) return INVALID_LINE_ENDING_BACKSLASH?;
 				while (is_ws(self.peek()) || is_newline(self.peek())) self.advance()!;
+
 			}
+
+			continue;
 		}
 
 		break LOOP;
@@ -329,7 +330,7 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 	}
 
 	// must have at least 3 chars (''') in smallest ml string
-	if (buf.len() <= 3)
+	if (buf.len() < 3)
 	{
 		self.error("multi-line string is not long enough; did add three apostrophes on both sides?");
 		return parser::MULTILINE_STRING_TOO_SHORT?;
