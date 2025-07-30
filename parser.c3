@@ -385,7 +385,7 @@ fn Object*? Parser.get_table(&self, StringList tables, Object *cur)
 	return cur;
 }
 
-fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool create_as_array = false)
+fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool array_of_table = false)
 {
 	foreach(table : tables)
 	{
@@ -397,7 +397,7 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool crea
 		}
 		cur = cur.get_or_create_obj(table);
 	}
-	if (create_as_array) {
+	if (array_of_table) {
 		if (!cur.is_indexable()) return INVALID_ARRAY_TABLE?;
 		if (cur.get_len() == 0) self.array_of_tables.push(cur);
 		cur.push_object(object::new_obj(self.allocator));
@@ -424,7 +424,7 @@ fn Object*? Parser.table(&self, Object *obj)
 {
 	self.must('[');
 
-	bool create_as_array = self.must('[');
+	bool array_of_table = self.must('[');
 
 	self.skip_ws()!;
 
@@ -441,7 +441,7 @@ fn Object*? Parser.table(&self, Object *obj)
 	// Verfiy that table does not exist yet
 	if (try tab = self.get_table(key, obj))
 	{
-		if (create_as_array)
+		if (array_of_table)
 		{
 			// Array table already exists and now check that it
 			// actually is an array (is_indexable())
@@ -458,7 +458,7 @@ fn Object*? Parser.table(&self, Object *obj)
 		}
 	}
 
-	Object *cur = self.create_table(key, obj, create_as_array)!;
+	Object *cur = self.create_table(key, obj, array_of_table)!;
 
 	self.skip_ws()!;
 
@@ -468,7 +468,7 @@ fn Object*? Parser.table(&self, Object *obj)
 		return UNCLOSED_STD_TABLE?;
 	}
 
-	if (create_as_array && !self.must(']')) {
+	if (array_of_table && !self.must(']')) {
 		self.error("expected ']]'; did you forget to add an additonal ']'?");
 		return UNCLOSED_ARRAY_TABLE?;
 	}
