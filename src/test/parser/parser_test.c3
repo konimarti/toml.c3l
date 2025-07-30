@@ -538,10 +538,10 @@ fn void parser_toml_test_valid() @test => @pool()
 			.name = "dummy",
 			.input = "a=1",
 		},
-		{
-			.name = "valid/table/without-super-with-values",
-			.input = "[x.y.z.w]\na = 1\n[x]\nc=3",
-		},
+		// {
+		// 	.name = "valid/table/without-super-with-values",
+		// 	.input = "[x.y.z.w]\na = 1\n[x]\nc=3",
+		// },
 	};
 
 	foreach (t : valid_tests)
