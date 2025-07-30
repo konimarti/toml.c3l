@@ -355,6 +355,11 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool crea
 	foreach(table : tables)
 	{
 		if (!cur.is_keyable()) return INVALID_TABLE?;
+		if (self.inline_tables.contains(cur))
+		{
+			self.error("create_table: keys cannot be added to inline tables outside the braces");
+			return UNMUTABLE_INLINE_TABLES?;
+		}
 		cur = cur.get_or_create_obj(table);
 	}
 	if (create_as_array) {
@@ -503,6 +508,9 @@ fn Object*? Parser.toml(&self) => @pool()
 		self.line += 1;
 	}
 	if (last_error) return last_error?;
+
+	if (obj.is_keyable() && obj.map.len() == 0) return INVALID_TABLE?;
+
 	return obj;
 }
 

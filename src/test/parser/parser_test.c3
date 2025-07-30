@@ -499,6 +499,11 @@ fn void parser_toml_test_invalid() @test => @pool()
 			.name = "invalid/array/no-comma-2",
 			.input = "no-comma = [ 1 2 3 ]",
 		},
+		{
+			.name = "invalid/inline-table/duplicate-key-3",
+			.input = "tbl = { fruit = { apple.color = \"red\" }, fruit.apple.texture = { smooth = true } }",
+		},
+
 	};
 
 	foreach (t : invalid_tests)
