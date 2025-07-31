@@ -140,6 +140,7 @@ fn void? Parser.integer(&self, Token *tok)
 		case 'n':
 		case 'i':
 		case 'e':
+		case 'E':
 		case '.':
 			self.parse_float(tok)!;
 		case 't':
@@ -189,6 +190,7 @@ fn void? Parser.parse_float(&self, Token *tok)
 		case '+':
 		case '-':
 		case 'e':
+		case 'E':
 		case '0'..'9':
 			if (self.peek() == '.' && !self.valid_surround(self.peek())) return INVALID_UNDERSCORE?;
 			tok.s.append_char(self.advance()!);

@@ -85,12 +85,12 @@ fn void parser_value_string() @test
 		{
 			.name = "quoted string",
 			.input = `"quoted\"string"rest`,
-			.want = "quoted\\\"string",
+			.want = "quoted\"string",
 		},
 		{
 			.name = "basic string with unicode",
-			.input = `"\UF09F918D"`,
-			.want = "\\UF09F918D",
+			.input = `"\U000003b4"`,
+			.want = "δ",
 		},
 		{
 			.name = "multiline basic string with mlb-quotes",

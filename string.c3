@@ -73,11 +73,11 @@ fn Object*? Parser.string(&self)
 		// basic-string / basic-literal
 		if (quote == '"')
 		{
-			self.basic_string()!;
+			return self.basic_string()!;
 		}
 		else if (quote == '\'')
 		{
-			self.literal_string()!;
+			return self.literal_string()!;
 		}
 		else
 		{
@@ -85,7 +85,6 @@ fn Object*? Parser.string(&self)
 			return parser::INVALID_QUOTE?;
 		}
 
-		return object::new_string(self.text()[1..^2], self.allocator);
 	}
 }
 
@@ -98,6 +97,7 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 {
 	// ml-basic-string-delim has been read at this point.
 
+	int len;
 	DString buf;
 	buf.tinit(16);
 
@@ -119,12 +119,13 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 		self.mlb_content(&buf)!;
 
 		// Maximum munch for quotes, but cannot have more than 5
-		int len = 0;
+		len = 0;
 		while (!self.at_end() && self.must('"'))
 		{
 			buf.append_char('"');
 			len++;
 		}
+
 		switch
 		{
 			case len > 5:
@@ -135,13 +136,6 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 			default:
 				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
 		}
-	}
-
-	// must have at least 6 chars (""""""") in smallest ml string
-	if (buf.len() < 3)
-	{
-		self.error("multi-line string is not long enough; did add three quotes on both sides?");
-		return parser::MULTILINE_STRING_TOO_SHORT?;
 	}
 
 	return object::new_string(buf.str_view().strip_end(`"""`), self.allocator);
@@ -198,17 +192,21 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				char u;
 				usz n, start;
 
-				buf.append_char(ESCAPE);
-
 				u = self.advance()!;
-				buf.append_char(u);
-
 				switch (u)
 				{
 					case 0x75: n = 4; // \u
 					case 0x55: n = 8; // \U
-					default: continue;
+					case 'b':  buf.append_char('\b');
+					case 't':  buf.append_char('\t');
+					case 'n':  buf.append_char('\n');
+					case 'f':  buf.append_char('\f');
+					case 'r':  buf.append_char('\r');
+					case '"':  buf.append_char('"');
+					case '\\': buf.append_char(ESCAPE);
+					default: return INVALID_ESCAPE_SEQUENCE?;
 				}
+				if (n == 0) continue;
 
 				start = self.current;
 				for (usz i = 0; i < n; i++)
@@ -229,10 +227,27 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				uint codepoint = string::tformat("0x%s", self.s[start:n]).to_int()!;
 
 				// Verify that it is a scalar Unicode codepoint
-				if (is_scalar_unicode(codepoint)) return INVALID_UNICODE?;
+				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE?;
 
 				// Add codepoint to buffer (by which is encoded to utf8)
-				buf.append_char32(codepoint);
+				if (codepoint <= 0x08 || (codepoint >= 0x0A && codepoint <= 0x1F) || codepoint == 0x7F)
+				{
+					// Needs to be encoded
+					Char16[2] tmp;
+					Char16 *p= &tmp[0];
+					conv::char32_to_utf16_unsafe(codepoint, &p);
+					buf.append_chars(`\u`);
+					buf.append_chars(string::tformat("%04x", tmp[0]));
+					if (tmp[1] > 0)
+					{
+						buf.append_chars(`\u`);
+						buf.append_chars(string::tformat("%04x", tmp[1]));
+					}
+				}
+				else
+				{
+					buf.append_char32(codepoint);
+				}
 
 			}
 			else
@@ -256,13 +271,9 @@ fn void? Parser.mlb_content(&self, DString *buf)
 			continue;
 		}
 
-		if (c == '"') {
-			break LOOP;;
-		}
-		else
-		{
-			return INVALID_STRING?;
-		}
+		if (c == '"') break LOOP;;
+
+		return INVALID_STRING?;
 	}
 }
 
@@ -274,31 +285,38 @@ fn void? Parser.mlb_content(&self, DString *buf)
 // escape = 0x5C ; \
 // escape-seq-char = 0x22 / 0x5C / 0x62 / 0x66 / 0x6E / 0x72 / 0x72 / unicode??
 // non-ascii = 0x80-D7FF / 0xE000-10FFFF
-fn void? Parser.basic_string(&self)
+fn Object*? Parser.basic_string(&self) => @pool()
 {
 	// beginning quote is already consumed.
 
+	DString buf;
+	buf.tinit(16);
+
+	char c;
 	while LOOP: (1)
 	{
+		c = self.peek();
+
 		// basic-unescaped = wschar / 0x21 / 0x23 - 0x5B / 0x5D - 0x-7E
-		if (basic_unescaped(self.peek()))
+		if (basic_unescaped(c))
 		{
-			self.advance()!;
+			buf.append_char(self.advance()!);
 			continue;
 		}
 
 		// basic-unescaped = non-ascii
-		if (is_unicode(self.peek()))
+		if (is_unicode(c))
 		{
 			Char32 codepoint = self.scan_unicode()!;
 			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			buf.append_char32(codepoint);
 			continue;
 		}
 
 		// escaped = escape escape-seq-char
 		if (self.must(ESCAPE))
 		{
-			if (escape_seq_char(self.peek()))
+			if (escape_seq_char(c))
 			{
 				char u;
 				usz n, start;
@@ -308,9 +326,18 @@ fn void? Parser.basic_string(&self)
 				{
 					case 0x75: n = 4;
 					case 0x55: n = 8;
-					default: continue;
+					case 'b':  buf.append_char('\b');
+					case 't':  buf.append_char('\t');
+					case 'n':  buf.append_char('\n');
+					case 'f':  buf.append_char('\f');
+					case 'r':  buf.append_char('\r');
+					case '"':  buf.append_char('"');
+					case '\\': buf.append_char(ESCAPE);
+					default: return INVALID_ESCAPE_SEQUENCE?;
 				}
+				if (n == 0) continue;
 
+				// Unicode handling
 				start = self.current;
 				for (usz i = 0; i < n; i++)
 				{
@@ -325,7 +352,31 @@ fn void? Parser.basic_string(&self)
 					}
 				}
 
-				validate_unicode(self.s[start:n])!;
+				// Parse Unicode escape sequence into unicode codepoint
+				uint codepoint = string::tformat("0x%s", self.s[start:n]).to_int()!;
+
+				// Verify that it is a scalar Unicode codepoint
+				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE?;
+
+				// Add codepoint to buffer (by which is encoded to utf8)
+				if (codepoint <= 0x08 || (codepoint >= 0x0A && codepoint <= 0x1F) || codepoint == 0x7F)
+				{
+					// Needs to be encoded
+					Char16[2] tmp;
+					Char16 *p= &tmp[0];
+					conv::char32_to_utf16_unsafe(codepoint, &p);
+					buf.append_chars(`\u`);
+					buf.append_chars(string::tformat("%04x", tmp[0]));
+					if (tmp[1] > 0)
+					{
+						buf.append_chars(`\u`);
+						buf.append_chars(string::tformat("%04x", tmp[1]));
+					}
+				}
+				else
+				{
+					buf.append_char32(codepoint);
+				}
 
 				continue;
 			}
@@ -341,6 +392,8 @@ fn void? Parser.basic_string(&self)
 		self.error("missing closing quote \"");
 		return parser::UNCLOSED_QUOTE?;
 	}
+
+	return object::new_string(buf.str_view(), self.allocator);
 }
 
 // ml-literal-string = ml-literal-string delim [ newline ] ml-literal-body
@@ -452,32 +505,38 @@ fn void? Parser.mll_content(&self, DString *buf)
 // literal-string = apostrophe *literal-char apostrophe
 // literal-char = 0x09 / 0x20 - 0x26 / 0x28 - 0x7E / non-ascii
 // non-ascii = 0x80-D7FF / 0xE000-10FFFF
-fn void? Parser.literal_string(&self)
+fn Object*? Parser.literal_string(&self) => @pool()
 {
 	// beginning apostrophe is already consumed.
-	char c;
 
-	while (1)
+	DString buf;
+	buf.tinit(16);
+
+	char c;
+	while LOOP: (1)
 	{
 		c = self.peek();
 
 		if (literal_char(c))
 		{
-			self.advance()!;
+			buf.append_char(self.advance()!);
 		}
 		else if (is_unicode(c))
 		{
 			Char32 codepoint = self.scan_unicode()!;
 			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			buf.append_char32(codepoint);
 		} else {
 			if (!self.must('\''))
 			{
 				self.error("missing closing apostrophe '");
 				return parser::UNCLOSED_QUOTE?;
 			}
-			return;
+			break LOOP;
 		}
 	}
+
+	return object::new_string(buf.str_view(), self.allocator);
 }
 
 fn Char32? Parser.scan_unicode(&self)
@@ -489,7 +548,8 @@ fn Char32? Parser.scan_unicode(&self)
 }
 
 <*
- Check if top two bits are set
+ Check if top two bits are set.
+
  With 0xc0 (b11_00_00_00) we check if it is a starting byte for a multi-byte utf8 sequence
  0b10_ would be continuation byte
  0b0*_ is a regular ASCII
