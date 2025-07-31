@@ -3,6 +3,9 @@ module toml::parser;
 import std::ascii;
 import std::collections::object;
 
+import std::io; // debugging
+import std::math;
+
 import toml::time;
 
 // integer = dec-int / hex-int / oct-int / bin-int
@@ -59,26 +62,29 @@ fn Object*? Parser.number_or_datetime(&self) => @pool()
 
 	String str = tok.s.str_view();
 
-	// Leading zeros
-	if (tok.has_sign)
+	if (tok.type == INTEGER || tok.type == FLOAT)
 	{
-		if (str.len >= 3 && str[1] == '0' && ascii::is_digit(str[2]))
+		// Leading zeros
+		if (tok.has_sign)
 		{
-			return INVALID_LEADING_ZERO?;
+			if (str.len >= 3 && str[1] == '0' && ascii::is_digit(str[2]))
+			{
+				return INVALID_LEADING_ZERO?;
+			}
 		}
-	}
-	else
-	{
-		if (str.len >= 2 && str[0] == '0' && ascii::is_digit(str[1]))
+		else
 		{
-			return INVALID_LEADING_ZERO?;
+			if (str.len >= 2 && str[0] == '0' && ascii::is_digit(str[1]))
+			{
+				return INVALID_LEADING_ZERO?;
+			}
 		}
 	}
 
 	switch (tok.type)
 	{
 		case INTEGER:
-			return object::new_int(str.to_int()!, self.allocator);
+			return object::new_int(str.to_int128()!, self.allocator);
 		case FLOAT:
 			return object::new_float(str.to_double()!, self.allocator);
 		case DATETIME:

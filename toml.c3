@@ -22,14 +22,36 @@ fn usz? TomlData.to_format(&self, Formatter* formatter) @dynamic
 fn String tescape_json(String s)
 {
 	DString buf = dstring::temp();
+	bool escaped = false;
 	foreach (c : s)
 	{
+		if (escaped)
+		{
+			escaped = false;
+			if (c == 'u')
+			{
+				buf.append_char('\\'); buf.append_char('u');
+				continue;
+			}
+			else
+			{
+				buf.append_chars(`\\`);
+			}
+		}
+
 		switch (c)
 		{
-		case '"': buf.append_char('\\');
+		case '"': buf.append_char('\\'); buf.append_char('"');
+		case '\b': buf.append_char('\\'); buf.append_char('b');
+		case '\n': buf.append_char('\\'); buf.append_char('n');
+		case '\f': buf.append_char('\\'); buf.append_char('f');
+		case '\r': buf.append_char('\\'); buf.append_char('r');
+		case '\t': buf.append_char('\\'); buf.append_char('t');
+		case '\\': escaped = true;
+		default: buf.append_char(c);
 		}
-		buf.append_char(c);
 	}
+	if (escaped) buf.append_chars(`\\`);
 	return buf.str_view();
 }
 
@@ -90,13 +112,27 @@ fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 				case UNSIGNED_INT:
 					return formatter.printf(`{"type":"integer","value":"%d"}`, (uint128)self.i)!;
 				case FLOAT:
-					return formatter.printf(`{"type":"float","value":"%g"}`, self.f)!;
+					return formatter.printf(`{"type":"float","value":"%.*f"}`, ndigits(self.f), self.f)!;
 				case ENUM:
 					return formatter.printf("%d", self.i)!;
 				default:
 					return formatter.printf("<>")!;
 			}
 	}
+}
+
+// FIXME: not working yet
+import std::math;
+fn usz ndigits(double f) @inline
+{
+	usz n;
+	f = math::abs(f);
+	while (f -= math::floor(f))
+	{
+		n++;
+		f *= 10;
+	}
+	return n;
 }
 
 fn Object*? TomlData.get(&self, String dotted_keys)
