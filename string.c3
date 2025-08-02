@@ -229,25 +229,8 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				// Verify that it is a scalar Unicode codepoint
 				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE?;
 
-				// Add codepoint to buffer (by which is encoded to utf8)
-				if (codepoint <= 0x08 || (codepoint >= 0x0A && codepoint <= 0x1F) || codepoint == 0x7F)
-				{
-					// Needs to be encoded
-					Char16[2] tmp;
-					Char16 *p= &tmp[0];
-					conv::char32_to_utf16_unsafe(codepoint, &p);
-					buf.append_chars(`\u`);
-					buf.append_chars(string::tformat("%04x", tmp[0]));
-					if (tmp[1] > 0)
-					{
-						buf.append_chars(`\u`);
-						buf.append_chars(string::tformat("%04x", tmp[1]));
-					}
-				}
-				else
-				{
-					buf.append_char32(codepoint);
-				}
+				// Add codepoint to buffer
+				buf.append_char32(codepoint);
 
 			}
 			else
@@ -358,25 +341,8 @@ fn Object*? Parser.basic_string(&self) => @pool()
 				// Verify that it is a scalar Unicode codepoint
 				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE?;
 
-				// Add codepoint to buffer (by which is encoded to utf8)
-				if (codepoint <= 0x08 || (codepoint >= 0x0A && codepoint <= 0x1F) || codepoint == 0x7F)
-				{
-					// Needs to be encoded
-					Char16[2] tmp;
-					Char16 *p= &tmp[0];
-					conv::char32_to_utf16_unsafe(codepoint, &p);
-					buf.append_chars(`\u`);
-					buf.append_chars(string::tformat("%04x", tmp[0]));
-					if (tmp[1] > 0)
-					{
-						buf.append_chars(`\u`);
-						buf.append_chars(string::tformat("%04x", tmp[1]));
-					}
-				}
-				else
-				{
-					buf.append_char32(codepoint);
-				}
+				// Add codepoint to buffer
+				buf.append_char32(codepoint);
 
 				continue;
 			}
@@ -526,7 +492,9 @@ fn Object*? Parser.literal_string(&self) => @pool()
 			Char32 codepoint = self.scan_unicode()!;
 			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
 			buf.append_char32(codepoint);
-		} else {
+		}
+		else
+		{
 			if (!self.must('\''))
 			{
 				self.error("missing closing apostrophe '");
