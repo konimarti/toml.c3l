@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [ tagged-json, master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    strategy:
+      # Don't abort runners if a single one fails
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: radekm/setup-c3@v2
+        with:
+          version: v0.7.4
+      - uses: toml-lang/setup-toml-test@v1
+        with:
+          version: v1.6.0
+      - name: Compile and run toml-test suite
+        run: |
+          c3c build tomlv
+          toml-test -- build/tomlv -j
