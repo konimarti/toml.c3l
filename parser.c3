@@ -351,11 +351,10 @@ fn void? Parser.insert(&self, Object *table, StringList k, Object* v)
 
 // keyval = key keyval-sep val
 // keyval-sep = ws '=' ws
-fn void? Parser.keyval(&self, Object *obj)
+fn void? Parser.keyval(&self, Object *current_table) => @pool()
 {
 	StringList key;
-	key.init(self.allocator, 4);
-	defer key.free();
+	key.tinit(4);
 
 	// parse key
 	if (!self.key(&key)!) return;
@@ -372,7 +371,7 @@ fn void? Parser.keyval(&self, Object *obj)
 	// parse value
 	Object* val = self.value()!;
 
-	self.insert(obj, key, val)!;
+	self.insert(current_table, key, val)!;
 }
 
 fn Object*? Parser.get_table(&self, StringList tables, Object *cur)
@@ -420,7 +419,7 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool arra
 //
 // array-table-open = '[[' ws
 // array-table-close = ws ']]' ws
-fn Object*? Parser.table(&self, Object *obj)
+fn Object*? Parser.table(&self, Object *obj) => @pool()
 {
 	self.must('[');
 
@@ -429,8 +428,7 @@ fn Object*? Parser.table(&self, Object *obj)
 	self.skip_ws()!;
 
 	StringList key;
-	key.init(self.allocator, 4);
-	defer key.free();
+	key.tinit(4);
 
 	if (!self.key(&key)!)
 	{
