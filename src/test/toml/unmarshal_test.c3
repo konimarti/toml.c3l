@@ -71,11 +71,12 @@ struct TomlDoc
 	Servers servers;
 }
 
-fn void test_unmarshal_toml_doc() @test
+fn void test_unmarshal_toml_doc() @test => @assert_leak(true)
 {
 	toml::parser::Parser scan;
-	scan.init(TOML_DOC, tmem);
+	scan.init(TOML_DOC, mem);
 	Object* obj = scan.toml()!!;
+	defer obj.free();
 
 	TomlDoc t;
 	toml::unmarshal_obj(&t, obj)!!;

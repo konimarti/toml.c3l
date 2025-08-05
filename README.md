@@ -1,9 +1,10 @@
-## TOML config parser for C3
+## TOML parser for C3
 
-Compatible with TOML version [v1.0.0](https://toml.io/en/v1.0.0).
+TOML v1.0 in C3.
 
-Parsed TOML config can be decoded into user-defined structs using reflection
-(see [example](#parse-toml-and-decode-to-struct)).
+* Implements TOML version [v1.0.0](https://toml.io/en/v1.0.0).
+* Decodes into structs ([example](#parse-toml-and-decode-to-struct)).
+* Passes the official [toml-test suite](https://github.com/toml-lang/toml-test/).
 
 It also comes with a TOML validator CLI tool. The validator tool can be
 compiled with `c3c build tomlv`. `tomlv` will validate a TOML config file that
@@ -31,7 +32,6 @@ Read data directly from a file name:
 TomlData td = toml::from_file("test.toml")!;
 defer td.free();
 ```
-
 To obtain a config value from the TOML tables, use the `TomlData.get` funtion and
 provide the table and value names in a dotted-key notation.
 
@@ -75,6 +75,23 @@ to the `./lib` folder of your C3 project and add the following to
 If you didn't clone it into the `lib` folder, adjust your
 `dependency-search-paths` accordingly.
 
+### Running tests
+
+Install the `toml-test` binary from the official [repo](https://github.com/toml-lang/toml-test):
+
+```sh
+go install github.com/toml-lang/toml-test/cmd/toml-test@v1.6.0
+```
+
+Then compile `tomlv`:
+```sh
+c3c bulid tomlv
+```
+and run the test suite as follows:
+```sh
+toml-test -- build/tomlv -j
+```
+to verify that all tests pass.
 
 ### Examples
 

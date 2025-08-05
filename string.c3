@@ -60,7 +60,7 @@ fn Object*? Parser.string(&self)
 		}
 		else
 		{
-			self.error("invalid quote; only use \" and '");
+			self.report_error("invalid quote; only use \" and '");
 			return parser::INVALID_QUOTE?;
 		}
 
@@ -81,7 +81,7 @@ fn Object*? Parser.string(&self)
 		}
 		else
 		{
-			self.error("invalid quote; only use \" and '");
+			self.report_error("invalid quote; only use \" and '");
 			return parser::INVALID_QUOTE?;
 		}
 
@@ -129,7 +129,7 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 		switch
 		{
 			case len > 5:
-				self.error("terminal quote sequence is invalid; there are too many..");
+				self.report_error("terminal quote sequence is invalid; there are too many..");
 				return parser::INVALID_TERMINAL_QUOTES?;
 			case len >= 3:
 				break LOOP;
@@ -218,7 +218,7 @@ fn void? Parser.mlb_content(&self, DString *buf)
 					}
 					else
 					{
-						self.error("invalid escaped unicode sequence");
+						self.report_error("invalid escaped unicode sequence");
 						return parser::INVALID_ESCAPE_UNICODE?;
 					}
 				}
@@ -330,7 +330,7 @@ fn Object*? Parser.basic_string(&self) => @pool()
 					}
 					else
 					{
-						self.error("invalid escaped unicode sequence");
+						self.report_error("invalid escaped unicode sequence");
 						return parser::INVALID_ESCAPE_UNICODE?;
 					}
 				}
@@ -348,14 +348,14 @@ fn Object*? Parser.basic_string(&self) => @pool()
 			}
 			else
 			{
-				self.error("invalid escape sequence");
+				self.report_error("invalid escape sequence");
 				return parser::INVALID_ESCAPE_SEQUENCE?;
 			}
 		}
 
 		if (self.must('"')) break LOOP;
 
-		self.error("missing closing quote \"");
+		self.report_error("missing closing quote \"");
 		return parser::UNCLOSED_QUOTE?;
 	}
 
@@ -401,7 +401,7 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 		switch
 		{
 			case len > 5:
-				self.error("terminal apostrophe sequence is invalid; there are too many..");
+				self.report_error("terminal apostrophe sequence is invalid; there are too many..");
 				return parser::INVALID_TERMINAL_QUOTES?;
 			case len >= 3:
 				break LOOP;
@@ -413,7 +413,7 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 	// must have at least 3 chars (''') in smallest ml string
 	if (buf.len() < 3)
 	{
-		self.error("multi-line string is not long enough; did add three apostrophes on both sides?");
+		self.report_error("multi-line string is not long enough; did add three apostrophes on both sides?");
 		return parser::MULTILINE_STRING_TOO_SHORT?;
 	}
 
@@ -497,7 +497,7 @@ fn Object*? Parser.literal_string(&self) => @pool()
 		{
 			if (!self.must('\''))
 			{
-				self.error("missing closing apostrophe '");
+				self.report_error("missing closing apostrophe '");
 				return parser::UNCLOSED_QUOTE?;
 			}
 			break LOOP;

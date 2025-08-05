@@ -49,9 +49,9 @@ struct Parser
 {
 	String s;
 	Allocator allocator;
-	int start;
-	int current;
-	int line;
+	usz start;
+	usz current;
+	usz line, column;
 	Object* current_table;
 	TableList explicit_tables;
 	TableList implicit_tables;
@@ -62,13 +62,22 @@ struct Parser
 fn Parser* Parser.init(&self, String s, Allocator allocator)
 {
 	*self = {.s = s, .allocator = allocator, .start = 0, .current = 0,
-		.line = 1, .current_table = null};
+		.line = 1, .column = 1, .current_table = null};
 	return self;
 }
 
 fn char? Parser.advance(&self)
 {
 	if (self.at_end()) return io::EOF?;
+	if (self.peek() == '\n')
+	{
+		self.line++;
+		self.column = 1;
+	}
+	else
+	{
+		self.column++;
+	}
 	return self.s[self.current++];
 }
 
@@ -83,9 +92,10 @@ fn bool Parser.at_end(&self)
 	return self.current >= self.s.len;
 }
 
-fn void Parser.error(&self, String msg)
+fn void Parser.report_error(&self, String msg)
 {
-	io::eprintfn("TOML ERROR -- Line %d: %s", self.line, msg)!!;
+	io::eprintfn("TOML ERROR -- Line %d, Col %d: %s",
+		self.line, self.column, msg)!!;
 }
 
 fn bool is_ws(char c) => (c == 0x20 || c == 0x09);
@@ -180,14 +190,14 @@ fn bool Parser.must(&self, char c)
 {
 	if (self.peek() != c) return false;
 
-	self.current++;
+	(void)self.advance();
 
 	return true;
 }
 
 fn bool? Parser.match(&self, String str)
 {
-	int backup = self.current;
+	usz backup = self.current;
 
 	foreach (s : str)
 	{
@@ -215,7 +225,7 @@ fn Object*? Parser.boolean(&self)
 	}
 	else
 	{
-		self.error("could not parse boolean; did you misspell 'true' or 'false'");
+		self.report_error("could not parse boolean; did you misspell 'true' or 'false'");
 		return INVALID_BOOLEAN?;
 	}
 
@@ -260,7 +270,7 @@ fn Object*? Parser.inline_table(&self)
 
 	if (!self.must('}'))
 	{
-		self.error("expected '}'");
+		self.report_error("expected '}'");
 		return UNCLOSED_INLINE_TABLE?;
 	}
 
@@ -344,22 +354,22 @@ fn void? Parser.insert(&self, Object *table, StringList k, Object* v)
 	Object* target = self.create_table(k, table, false, true)!;
 	if (!target.is_keyable())
 	{
-		self.error("Key does not point to a table");
+		self.report_error("Key does not point to a table");
 		return INVALID_KEY?;
 	}
 	if (target.has_key(key))
 	{
-		self.error("key is already used; duplicated keys are not supported.");
+		self.report_error("key is already used; duplicated keys are not supported.");
 		return DUPLICATED_KEY?;
 	}
 	else if (self.inline_tables.contains(target))
 	{
-		self.error("keys cannot be added to inline tables outside the braces");
+		self.report_error("keys cannot be added to inline tables outside the braces");
 		return UNMUTABLE_INLINE_TABLES?;
 	}
 	else if (self.array_of_tables.contains(target))
 	{
-		self.error("keys cannot be added to array of ables");
+		self.report_error("keys cannot be added to array of ables");
 		return UNMUTABLE_INLINE_TABLES?;
 	}
 	target.set(key, v);
@@ -379,7 +389,7 @@ fn void? Parser.keyval(&self, Object *current_table) => @pool()
 	self.skip_ws()!;
 	if (!self.must('='))
 	{
-		self.error("expected '='");
+		self.report_error("expected '='");
 		return MISSING_KEYVAL_SEPARATOR?;
 	}
 	self.skip_ws()!;
@@ -419,7 +429,7 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool arra
 
 		if (self.inline_tables.contains(cur))
 		{
-			self.error("keys cannot be added to inline tables outside the braces");
+			self.report_error("keys cannot be added to inline tables outside the braces");
 			return UNMUTABLE_INLINE_TABLES?;
 		}
 
@@ -435,7 +445,7 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool arra
 
 			if (self.explicit_tables.contains(cur))
 			{
-				self.error("trying to use an explicit table in an implicity waytrying to use an explicit table in an implicity way..");
+				self.report_error("trying to use an explicit table in an implicity waytrying to use an explicit table in an implicity way..");
 				return INVALID_TABLE?;
 			}
 
@@ -486,7 +496,7 @@ fn Object*? Parser.table(&self, Object *obj) => @pool()
 
 	if (!self.key(&key)!)
 	{
-		self.error("you must specify a table name between [ and ]");
+		self.report_error("you must specify a table name between [ and ]");
 		return MISSING_TABLE_NAME?;
 	}
 
@@ -507,21 +517,21 @@ fn Object*? Parser.table(&self, Object *obj) => @pool()
 			// Regular table already exists as an implicit table
 			if (self.implicit_tables.contains(tab))
 			{
-				self.error("table already exists (implicitly defined)");
+				self.report_error("table already exists (implicitly defined)");
 				return DUPLICATED_TABLE?;
 			}
 
 			// Cannot have two explicitly defined tables either
 			if (self.explicit_tables.contains(tab))
 			{
-				self.error("table already exists (explicitly defined)");
+				self.report_error("table already exists (explicitly defined)");
 				return DUPLICATED_TABLE?;
 			}
 
 			// Cannot conflict with an array of tables
 			if (self.array_of_tables.contains(tab))
 			{
-				self.error("table already exists (array of tables)");
+				self.report_error("table already exists (array of tables)");
 				return DUPLICATED_TABLE?;
 			}
 		}
@@ -532,13 +542,12 @@ fn Object*? Parser.table(&self, Object *obj) => @pool()
 	self.skip_ws()!;
 
 	if (!self.must(']')) {
-		io::printfn("line %d: expected ']' but got %c", self.line, self.peek());
-		self.error("expected ']'; did you forget to add the closing bracket ']'?");
+		self.report_error("expected ']'; did you forget to add the closing bracket ']'?");
 		return UNCLOSED_STD_TABLE?;
 	}
 
 	if (array_of_table && !self.must(']')) {
-		self.error("expected ']]'; did you forget to add an additonal ']'?");
+		self.report_error("expected ']]'; did you forget to add an additonal ']'?");
 		return UNCLOSED_ARRAY_TABLE?;
 	}
 
@@ -574,29 +583,22 @@ fn void? Parser.expression(&self, Object *obj)
 // newline =/ 0x0D.0x0A
 fn Object*? Parser.toml(&self) => @pool()
 {
-	Object* obj = object::new_obj(self.allocator);
-	self.current_table = obj;
+	Object* root = object::new_obj(self.allocator);
+	self.current_table = root;
 
-	self.explicit_tables.clear();
 	self.explicit_tables.tinit();
-
-	self.implicit_tables.clear();
 	self.implicit_tables.tinit();
-
-	self.inline_tables.clear();
 	self.inline_tables.tinit();
-
-	self.array_of_tables.clear();
 	self.array_of_tables.tinit();
 
 	fault last_error;
 	int max_lines = int.max;
 	while LOOP: (max_lines--) {
-		if (catch err = self.expression(obj))
+		if (catch err = self.expression(root))
 		{
 			if (err == io::EOF) break LOOP;
 
-			self.error(string::tformat("%s", err));
+			self.report_error(string::tformat("%s", err));
 			last_error = last_error ? MULTIPLE_ERRORS : err;
 
 			// synchronize parser after error by moving to the next
@@ -614,7 +616,7 @@ fn Object*? Parser.toml(&self) => @pool()
 		{
 			if (self.at_end() || self.peek() != '\n')
 			{
-				self.error("Bare CR are not allowed.");
+				self.report_error("Bare CR are not allowed.");
 				return MISSING_NEWLINE?;
 			}
 		}
@@ -623,16 +625,14 @@ fn Object*? Parser.toml(&self) => @pool()
 		{
 			if (self.at_end()) break LOOP;
 			io::printfn("remaining: %s", (String)self.s[self.current ..]);
-			self.error("Missing Newline after an expression");
+			self.report_error("Missing Newline after an expression");
 			return MISSING_NEWLINE?;
 		}
-
-		self.line += 1;
 	}
 
 	// If en error has been encountered, return it
 	if (last_error) return last_error?;
 
-	return obj;
+	return root;
 }
 

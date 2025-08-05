@@ -94,7 +94,7 @@ fn Object*? Parser.number_or_datetime(&self) => @pool()
 			}
 			return INVALID_DATETIME?;
 		default:
-			self.error("invalid token type in parsing a number of a datetime.");
+			self.report_error("invalid token type in parsing a number of a datetime.");
 			return parser::INVALID_TOKEN_TYPE?;
 	}
 }
