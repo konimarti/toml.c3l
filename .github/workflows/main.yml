@@ -19,9 +19,9 @@ jobs:
       - uses: radekm/setup-c3@v2
         with:
           version: v0.7.4
-      - uses: toml-lang/setup-toml-test@v1
-        with:
-          version: v1.6.0
+      - uses: actions/setup-go@v4
+      - name: Install toml-test
+        run: go install github.com/toml-lang/toml-test/cmd/toml-test@v1.6.0
       - name: Compile and run toml-test suite
         run: |
           c3c build tomlv
