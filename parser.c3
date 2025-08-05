@@ -357,6 +357,11 @@ fn void? Parser.insert(&self, Object *table, StringList k, Object* v)
 		self.error("keys cannot be added to inline tables outside the braces");
 		return UNMUTABLE_INLINE_TABLES?;
 	}
+	else if (self.array_of_tables.contains(target))
+	{
+		self.error("keys cannot be added to array of ables");
+		return UNMUTABLE_INLINE_TABLES?;
+	}
 	target.set(key, v);
 }
 
@@ -399,7 +404,18 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool arra
 {
 	foreach(table : tables)
 	{
-		if (!cur.is_keyable()) return INVALID_TABLE?;
+		if (!cur.is_keyable())
+		{
+			if (cur.is_array())
+			{
+				cur = cur.get_at(cur.get_len()-1);
+			}
+			else
+			{
+				return INVALID_TABLE?;
+			}
+
+		}
 		if (self.inline_tables.contains(cur))
 		{
 			self.error("create_table: keys cannot be added to inline tables outside the braces");
@@ -423,10 +439,11 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool arra
 		if (!cur.is_indexable()) return INVALID_ARRAY_TABLE?;
 		if (cur.get_len() == 0) self.array_of_tables.push(cur);
 		cur.push_object(object::new_obj(self.allocator));
-	}
-	if (cur.is_array()) {
 		return cur.get_at(cur.get_len()-1);
 	}
+	// if (cur.is_array()) {
+		// return cur.get_at(cur.get_len()-1);
+	// }
 
 	return cur;
 }
@@ -484,6 +501,13 @@ fn Object*? Parser.table(&self, Object *obj) => @pool()
 			if (self.explicit_tables.contains(tab))
 			{
 				self.error("table already exists (which was explicitly defined)");
+				return DUPLICATED_TABLE?;
+			}
+
+			// Cannot conflict with an array of tables
+			if (self.array_of_tables.contains(tab))
+			{
+				self.error("trying to define a table that is already defined as an array of table");
 				return DUPLICATED_TABLE?;
 			}
 		}
