@@ -539,7 +539,14 @@ fn Object*? Parser.toml(&self) => @pool()
 			}
 		}
 
-		self.must('\r');
+		if (self.must('\r'))
+		{
+			if (self.at_end() || self.peek() != '\n')
+			{
+				self.error("Bare CR are not allowed.");
+				return MISSING_NEWLINE?;
+			}
+		}
 
 		if (!self.must('\n'))
 		{
@@ -554,9 +561,6 @@ fn Object*? Parser.toml(&self) => @pool()
 
 	// If en error has been encountered, return it
 	if (last_error) return last_error?;
-
-	// Treat an empty table as an error
-	if (obj.is_keyable() && obj.map.len() == 0) return INVALID_TABLE?;
 
 	return obj;
 }
