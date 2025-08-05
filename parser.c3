@@ -416,34 +416,48 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool arra
 			}
 
 		}
+
 		if (self.inline_tables.contains(cur))
 		{
-			self.error("create_table: keys cannot be added to inline tables outside the braces");
+			self.error("keys cannot be added to inline tables outside the braces");
 			return UNMUTABLE_INLINE_TABLES?;
 		}
+
 		cur = cur.get_or_create_obj(table);
+
 		if (save_implicit)
 		{
+
 			if (!self.implicit_tables.contains(cur))
 			{
 				self.implicit_tables.push(cur);
 			}
+
 			if (self.explicit_tables.contains(cur))
 			{
-				self.error("save_implicit encountered explicit table");
+				self.error("trying to use an explicit table in an implicity waytrying to use an explicit table in an implicity way..");
 				return INVALID_TABLE?;
 			}
+
 		}
 	}
+
 	if (array_of_table) {
-		if (!cur.is_indexable()) return INVALID_ARRAY_TABLE?;
-		if (cur.get_len() == 0) self.array_of_tables.push(cur);
+
+		if (!cur.is_indexable())
+		{
+			return INVALID_ARRAY_TABLE?;
+		}
+
+		if (cur.get_len() == 0)
+		{
+			self.array_of_tables.push(cur);
+		}
+
 		cur.push_object(object::new_obj(self.allocator));
+
 		return cur.get_at(cur.get_len()-1);
 	}
-	// if (cur.is_array()) {
-		// return cur.get_at(cur.get_len()-1);
-	// }
 
 	return cur;
 }
@@ -493,21 +507,21 @@ fn Object*? Parser.table(&self, Object *obj) => @pool()
 			// Regular table already exists as an implicit table
 			if (self.implicit_tables.contains(tab))
 			{
-				self.error("table already exists (which was implicitly defined)");
+				self.error("table already exists (implicitly defined)");
 				return DUPLICATED_TABLE?;
 			}
 
 			// Cannot have two explicitly defined tables either
 			if (self.explicit_tables.contains(tab))
 			{
-				self.error("table already exists (which was explicitly defined)");
+				self.error("table already exists (explicitly defined)");
 				return DUPLICATED_TABLE?;
 			}
 
 			// Cannot conflict with an array of tables
 			if (self.array_of_tables.contains(tab))
 			{
-				self.error("trying to define a table that is already defined as an array of table");
+				self.error("table already exists (array of tables)");
 				return DUPLICATED_TABLE?;
 			}
 		}
