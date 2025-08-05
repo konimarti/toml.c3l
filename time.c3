@@ -248,7 +248,7 @@ fn void? parse_time(Lexer *lexer, TomlDateTime *dt)
 
 fn TomlDateTime? parse_string(String input)
 {
-	Lexer lexer = { input, 0 };
+	Lexer lexer = { input.trim(), 0 };
 	TomlDateTime dt = {};
 
 	lexer.expect(NUMBER)!;
