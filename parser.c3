@@ -53,6 +53,8 @@ struct Parser
 	int current;
 	int line;
 	Object* current_table;
+	TableList explicit_tables;
+	TableList implicit_tables;
 	TableList inline_tables;
 	TableList array_of_tables;
 }
@@ -339,7 +341,7 @@ fn bool? Parser.key(&self, StringList *list)
 fn void? Parser.insert(&self, Object *table, StringList k, Object* v)
 {
 	String key = k.pop()!;
-	Object* target = self.create_table(k, table)!;
+	Object* target = self.create_table(k, table, false, true)!;
 	if (!target.is_keyable())
 	{
 		self.error("Key does not point to a table");
@@ -393,7 +395,7 @@ fn Object*? Parser.get_table(&self, StringList tables, Object *cur)
 	return cur;
 }
 
-fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool array_of_table = false)
+fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool array_of_table, bool save_implicit)
 {
 	foreach(table : tables)
 	{
@@ -404,6 +406,18 @@ fn Object*? Parser.create_table(&self, StringList tables, Object *cur, bool arra
 			return UNMUTABLE_INLINE_TABLES?;
 		}
 		cur = cur.get_or_create_obj(table);
+		if (save_implicit)
+		{
+			if (!self.implicit_tables.contains(cur))
+			{
+				self.implicit_tables.push(cur);
+			}
+			if (self.explicit_tables.contains(cur))
+			{
+				self.error("save_implicit encountered explicit table");
+				return INVALID_TABLE?;
+			}
+		}
 	}
 	if (array_of_table) {
 		if (!cur.is_indexable()) return INVALID_ARRAY_TABLE?;
@@ -459,13 +473,23 @@ fn Object*? Parser.table(&self, Object *obj) => @pool()
 		}
 		else
 		{
-			// Regular table already exists
-			self.error("table already exists");
-			return DUPLICATED_TABLE?;
+			// Regular table already exists as an implicit table
+			if (self.implicit_tables.contains(tab))
+			{
+				self.error("table already exists (which was implicitly defined)");
+				return DUPLICATED_TABLE?;
+			}
+
+			// Cannot have two explicitly defined tables either
+			if (self.explicit_tables.contains(tab))
+			{
+				self.error("table already exists (which was explicitly defined)");
+				return DUPLICATED_TABLE?;
+			}
 		}
 	}
 
-	Object *cur = self.create_table(key, obj, array_of_table)!;
+	Object *cur = self.create_table(key, obj, array_of_table, false)!;
 
 	self.skip_ws()!;
 
@@ -479,6 +503,8 @@ fn Object*? Parser.table(&self, Object *obj) => @pool()
 		self.error("expected ']]'; did you forget to add an additonal ']'?");
 		return UNCLOSED_ARRAY_TABLE?;
 	}
+
+	if (!array_of_table) self.explicit_tables.push(cur);
 
 	return cur;
 }
@@ -512,6 +538,12 @@ fn Object*? Parser.toml(&self) => @pool()
 {
 	Object* obj = object::new_obj(self.allocator);
 	self.current_table = obj;
+
+	self.explicit_tables.clear();
+	self.explicit_tables.tinit();
+
+	self.implicit_tables.clear();
+	self.implicit_tables.tinit();
 
 	self.inline_tables.clear();
 	self.inline_tables.tinit();
