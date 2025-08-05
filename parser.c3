@@ -221,31 +221,39 @@ fn Object*? Parser.boolean(&self)
 }
 
 // inline-table = inline-table-open [ inline-table-keyvals ] inline-table-close
-// inline-table-open = '[' ws
-// inline-table-close = ws ']'
+// inline-table-open = '{' ws
+// inline-table-close = ws '}'
 // inline-table-sep = ws ',' ws
 // inline-table-keyvals = keyval [ inline-table-sep inline-table-keyvals ]
 fn Object*? Parser.inline_table(&self)
 {
 	self.must('{');
 
+	self.skip_ws()!;
+
+	if (self.peek() == ',') return INVALID_COMMA?;
+
 	Object* table = object::new_obj(self.allocator);
-	while LOOP: (1)
+	while INLINE_TABLE: (1)
 	{
-		self.skip_ws()!;
-
-		switch (self.peek())
-		{
-		case ',':
-		case '}':
-			return INVALID_COMMA?;
-		}
-
 		self.keyval(table)!;
 
+		// Read inline-table-sep
 		self.skip_ws()!;
 
-		if (!self.must(',')) break LOOP;
+		if (self.must(','))
+		{
+			self.skip_ws()!;
+			switch (self.peek())
+			{
+			case ',':
+			case '}':
+				return INVALID_COMMA?;
+			}
+			continue;
+		}
+
+		break INLINE_TABLE;
 	}
 
 	if (!self.must('}'))

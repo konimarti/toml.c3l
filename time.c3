@@ -137,7 +137,7 @@ enum TokenType
 	COLON,
 	DOT,
 	T,
-	Z,
+	UTC,
 	PLUS,
 	MINUS,
 	SPACE,
@@ -182,8 +182,10 @@ fn Token? Lexer.next(&self, usz ndigits = 0)
 	{
 		case ':': self.pos += 1; return { .type = COLON };
 		case '.': self.pos += 1; return { .type = DOT };
+		case 't':
 		case 'T': self.pos += 1; return { .type = T };
-		case 'Z': self.pos += 1; return { .type = Z };
+		case 'z':
+		case 'Z': self.pos += 1; return { .type = UTC };
 		case '+': self.pos += 1; return { .type = PLUS };
 		case '-': self.pos += 1; return { .type = MINUS };
 		case ' ': self.pos += 1; return { .type = SPACE };
@@ -227,7 +229,7 @@ fn void? parse_time(Lexer *lexer, TomlDateTime *dt)
 
 	switch (tok.type)
 	{
-		case Z:
+		case UTC:
 			dt.kind = OFFSET_DATE_TIME;
 			dt.tz_utc = true;
 		case PLUS:

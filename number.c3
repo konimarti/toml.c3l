@@ -220,6 +220,7 @@ fn void? Parser.date_time(&self, Token *tok)
 		case '0'..'9':
 		case 't':
 		case 'T':
+		case 'z':
 		case 'Z':
 		case ' ':
 		case '.':

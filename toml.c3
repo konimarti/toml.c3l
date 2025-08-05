@@ -1,6 +1,6 @@
 module toml;
 
-import std::io;
+import std::io, std::math;
 import std::collections::object @public;
 
 import toml::time;
@@ -118,7 +118,7 @@ fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 				case UNSIGNED_INT:
 					return formatter.printf(`{"type":"integer","value":"%d"}`, (uint128)self.i)!;
 				case FLOAT:
-					return formatter.printf(`{"type":"float","value":"%.9f"}`, self.f)!;
+					return formatter.printf(`{"type":"float","value":"%.16e"}`, (double)self.f)!;
 				case ENUM:
 					return formatter.printf("%d", self.i)!;
 				default:
