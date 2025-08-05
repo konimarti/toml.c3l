@@ -3,7 +3,7 @@ module tomltest;
 import std::io;
 import toml;
 
-fn void main()
+fn void main() => @assert_leak(true)
 {
 	String s =
 	`# toml config file

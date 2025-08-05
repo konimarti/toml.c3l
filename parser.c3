@@ -297,37 +297,38 @@ fn Object*? Parser.value(&self)
 // Returns true when keys were parsed.
 fn bool? Parser.key(&self, StringList *list)
 {
+	String text;
+	Object *s;
+
 	while (1)
 	{
 		self.skip_ws()!;
 
-		self.start = self.current;
-
-		bool dequote = false;
 		if (self.must('"'))
 		{
 			// quoted-key: basic-string
-			self.basic_string()!;
-			dequote = true;
+			s = self.basic_string()!;
+			list.push(s.s.copy(list.allocator));
+			s.free();
 		}
 		else if (self.must('\''))
 		{
 			// quoted-key: literal-string
-			self.literal_string()!;
-			dequote = true;
+			s = self.literal_string()!;
+			list.push(s.s.copy(list.allocator));
+			s.free();
 		}
 		else
 		{
+			self.start = self.current;
+
 			// unquoted-key
 			while (is_unquoted_key(self.peek())) self.advance()!;
+
+			if (self.current <= self.start) return !list.is_empty();
+
+			list.push(self.text().copy(list.allocator));
 		}
-
-		if (self.current <= self.start) return !list.is_empty();
-
-		String text = self.text();
-		if (dequote && text.len > 2) text = text[1 .. ^2];
-
-		list.push(text);
 
 		self.skip_ws()!;
 
