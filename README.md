@@ -32,16 +32,34 @@ Read data directly from a file name:
 TomlData td = toml::from_file("test.toml")!;
 defer td.free();
 ```
-To obtain a config value from the TOML tables, use the `TomlData.get` funtion and
-provide the table and value names in a dotted-key notation.
+To obtain a config value from the TOML tables, use the `TomlData.get` function
+(or the `[]` operator) and provide the table and value names in a dotted-key
+notation.
 
 For example, the `color` value from the TOML config
 ```cpp
 [fruit]
 color = 0x3AA832
 ```
-can be obtained with `td.get("fruit.color")`. The return value of `TomlData.get`
-is a `std::collections::Object`.
+can be obtained with `td.get("fruit.color")` or `td["fruit.color"]`. The
+return value is of type `std::collections::Object*`.
+
+### Error handling
+
+If an error is encountered during the parsing, the line and column positions
+together with an error description are printed on stderr:
+
+```sh
+$ echo "\"a quoted key without a value\"" | build/tomlv
+TOML ERROR -- Line 1, Col 31: expected '='
+TOML ERROR -- Line 1, Col 31: parser::MISSING_KEYVAL_SEPARATOR
+"a quoted key without a value"
+                              ^
+  Invalid TOML: parser::MISSING_KEYVAL_SEPARATOR
+```
+
+The error output can be deactivated by setting the bool argument `verbose` to
+`false` in the `toml::from_*` functions.
 
 ### Unmarshal TOML into struct
 

@@ -8,6 +8,8 @@ import toml::time;
 struct TomlData (Printable)
 {
 	Object* table;
+	String input;
+	Allocator allocator;
 }
 
 fn usz? TomlData.to_format(&self, Formatter* formatter) @dynamic
@@ -58,8 +60,6 @@ fn String tescape_json(String s)
 	}
 	return buf.str_view();
 }
-
-
 
 fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 {
@@ -127,7 +127,7 @@ fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 	}
 }
 
-fn Object*? TomlData.get(&self, String dotted_keys)
+fn Object*? TomlData.get(&self, String dotted_keys) @operator([])
 {
 	String[] keys = dotted_keys.tsplit(".", 0);
 	Object* value = self.table;
@@ -144,26 +144,36 @@ fn void TomlData.free(&self)
 	{
 		self.table.free();
 	}
+	allocator::free(self.allocator, self.input);
 }
 
-fn TomlData? from_file(String filename, Allocator allocator = mem)
+fn TomlData? from_file(String filename, Allocator allocator = mem, bool verbose = true)
 {
 	File f = file::open(filename, "r")!;
 	defer (void)f.close();
-	TomlData? cfg = from_stream(&f, allocator)!;
-	return cfg;
+	return from_stream(&f, allocator, verbose)!;
 }
 
-fn TomlData? from_stream(InStream reader, Allocator allocator = mem)
+fn TomlData? from_stream(InStream reader, Allocator allocator = mem, bool verbose = true) => @pool()
 {
 	ByteWriter writer;
 	io::copy_to(reader, writer.tinit())!;
-	return (TomlData){(toml::parser::Parser){}.init(writer.str_view(), allocator).toml()!};
+	String input = writer.str_view().copy(allocator);
+	return {
+		.input     = input,
+		.table     = (toml::parser::Parser){}.init(input, allocator, verbose).toml()!,
+		.allocator = allocator
+	};
 }
 
-fn TomlData? from_string(String s, Allocator allocator = mem)
+fn TomlData? from_string(String s, Allocator allocator = mem, bool verbose = true)
 {
-	return (TomlData){(toml::parser::Parser){}.init(s, allocator).toml()!};
+	String input = s.copy(allocator);
+	return {
+		.input     = input,
+		.table     = (toml::parser::Parser){}.init(input, allocator, verbose).toml()!,
+		.allocator = allocator
+	};
 }
 
 macro void? TomlData.unmarshal(&self, t) => unmarshal_obj(t, self.table);

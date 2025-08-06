@@ -15,6 +15,6 @@ fn void main() => @assert_leak(true)
 	TomlData td = toml::from_string(s)!!;
 	defer td.free();
 
-	io::printfn("title: %s", td.get("title")!!);
-	io::printfn("ports: %s", td.get("database.ports")!!);
+	io::printfn("title: %s", td["title"]!!);
+	io::printfn("ports: %s", td["database.ports"]!!);
 }
