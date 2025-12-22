@@ -28,13 +28,13 @@ fn String tescape_json(String s)
 	{
 		switch (c)
 		{
-		case '"': buf.append_char('\\'); buf.append_char('"');
+		case '"':  buf.append_char('\\'); buf.append_char('"');
 		case '\b': buf.append_char('\\'); buf.append_char('b');
 		case '\n': buf.append_char('\\'); buf.append_char('n');
 		case '\f': buf.append_char('\\'); buf.append_char('f');
 		case '\r': buf.append_char('\\'); buf.append_char('r');
 		case '\t': buf.append_char('\\'); buf.append_char('t');
-		case '/': buf.append_char('\\'); buf.append_char('/');
+		case '/':  buf.append_char('\\'); buf.append_char('/');
 		case '\\': buf.append_char('\\'); buf.append_char('\\');
 		default:
 			// Encode to utf
@@ -44,12 +44,12 @@ fn String tescape_json(String s)
 				Char16[2] tmp;
 				Char16 *p= &tmp[0];
 				conv::char32_to_utf16_unsafe(c, &p);
-				buf.append_chars(`\u`);
-				buf.append_chars(string::tformat("%04x", tmp[0]));
+				buf.append_string(`\u`);
+				buf.append_string(string::tformat("%04x", tmp[0]));
 				if (tmp[1] > 0)
 				{
-					buf.append_chars(`\u`);
-					buf.append_chars(string::tformat("%04x", tmp[1]));
+					buf.append_string(`\u`);
+					buf.append_string(string::tformat("%04x", tmp[1]));
 				}
 			}
 			else

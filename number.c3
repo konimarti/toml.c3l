@@ -201,10 +201,10 @@ fn void? Parser.parse_float(&self, Token *tok)
 			if (self.peek() == '.' && !self.valid_surround(self.peek())) return INVALID_UNDERSCORE?;
 			tok.s.append_char(self.advance()!);
 		case 'n':
-			if (self.match("nan")!) tok.s.append_chars("nan");
+			if (self.match("nan")!) tok.s.append_string("nan");
 			return;
 		case 'i':
-			if (self.match("inf")!) tok.s.append_chars("infinity");
+			if (self.match("inf")!) tok.s.append_string("infinity");
 			return;
 		default:
 			return;
