@@ -5,6 +5,8 @@ import std::collections::object @public;
 
 import toml::time;
 
+faultdef INVALID_INPUT_FORMAT;
+
 struct TomlData (Printable)
 {
 	Object* table;
@@ -177,3 +179,21 @@ fn TomlData? from_string(String s, Allocator allocator = mem, bool verbose = tru
 }
 
 macro void? TomlData.unmarshal(&self, t) => unmarshal_obj(t, self.table);
+
+macro TomlData? parse(input, Allocator allocator = mem, bool verbose = true)
+{
+	$switch $typeof(input):
+		$case InStream:
+			return from_stream(input, allocator, verbose);
+		$case DString:
+			return from_string(input.str_view(), allocator, verbose);
+		$case String:
+			return from_string(input, allocator, verbose);
+		$case char[]:
+			return from_string((String)input[..], allocator, verbose);
+		$default:
+			return INVALID_INPUT_FORMAT?;
+	$endswitch
+}
+macro TomlData? tparse(input, bool verbose = true) => load(input, tmem, verbose);
+
