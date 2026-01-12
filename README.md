@@ -1,53 +1,50 @@
-## TOML parser for C3
+# TOML parser for C3
 
-TOML v1.0 in C3.
+A [TOML v1.0.0] parse and validator for the [C3 programming language](http://c3-lang.org)..
 
-* Implements TOML version [v1.0.0](https://toml.io/en/v1.0.0).
-* Decodes into structs ([example](#parse-toml-and-decode-to-struct)).
-* Passes the official [toml-test suite](https://github.com/toml-lang/toml-test/).
-
-It also comes with a TOML validator CLI tool. The validator tool can be
-compiled with `c3c build tomlv`. `tomlv` will validate a TOML config file that
-is read from stdin.
+* Implements the full TOML v1.0.0 specification.
+* Decodes TOML data into structs ([example below](#parse-toml-and-decode-to-struct)).
+* Fully passes the official [toml-test suite](https://github.com/toml-lang/toml-test/).
+* Includes a command-line TOML validator tool (`tomlv`) for syntax checking.
 
 ### Usage
 
-TOML config files can be parsed from a `String`, a `InStream` (such as `File`)
-or directly from a file name.
+TOML configuration files can be parsed from a `String`, an `InStream` (e.g.
+`File`), or directly from a file path.
 
 Read data from `String s`:
 ```
 TomlData td = toml::from_string(s)!;
-defer td.free();
 ```
 
 Read data from `InStream in`:
 ```
 TomlData td = toml::from_stream(in)!;
-defer td.free();
 ```
 
-Read data directly from a file name:
+Read data directly from a file path:
 ```
 TomlData td = toml::from_file("test.toml")!;
-defer td.free();
 ```
-To obtain a config value from the TOML tables, use the `TomlData.get` function
-(or the `[]` operator) and provide the table and value names in a dotted-key
-notation.
 
-For example, the `color` value from the TOML config
+To access a configuration value, use `TomlData.get` (or overloaded `[]`
+operator) with dotted-key notation.
+
+For example, given:
 ```cpp
 [fruit]
 color = 0x3AA832
 ```
-can be obtained with `td.get("fruit.color")` or `td["fruit.color"]`. The
-return value is of type `std::collections::Object*`.
+you can read the value with:
+`td.get("fruit.color");`
+or: `td["fruit.color"];`
+
+Both return a pointer of type `std::collections::Object*`.
 
 ### Error handling
 
-If an error is encountered during the parsing, the line and column positions
-together with an error description are printed on stderr:
+When parsing errors occur, detailed diagnostics are printed to `stderr`,
+including the line, column and error type:
 
 ```sh
 $ echo "\"a quoted key without a value\"" | build/tomlv
@@ -58,12 +55,12 @@ TOML ERROR -- Line 1, Col 31: parser::MISSING_KEYVAL_SEPARATOR
   Invalid TOML: parser::MISSING_KEYVAL_SEPARATOR
 ```
 
-The error output can be deactivated by setting the bool argument `verbose` to
-`false` in the `toml::from_*` functions.
+Error messages can be silenced by setting the optional `verbose` to `false` in
+any `toml::from_*` function.
 
-### Unmarshal TOML into struct
+### Decoding into Structs
 
-The parsed TOML data can also be unmarshalled into a custom struct with the
+Parsed TOML data can directly unmarshalled into a user-defined struct using the 
 `TomlData.unmarshal` macro:
 
 ```cpp
@@ -78,10 +75,13 @@ For a more detailed example, see below.
 
 ### Installation
 
-Clone the repository with
-```git clone http://github.com/konimarti/toml.c3l```
-to the `./lib` folder of your C3 project and add the following to
-`project.json`:
+Add the library as a submodule to your C3 project:
+
+```
+git submodule add http://github.com/konimarti/toml.c3l lib
+```
+
+Then update your `project.json` to include:
 
 ```json
 {
@@ -90,26 +90,18 @@ to the `./lib` folder of your C3 project and add the following to
 }
 ```
 
-If you didn't clone it into the `lib` folder, adjust your
-`dependency-search-paths` accordingly.
+Adjust `dependency-search-paths` if you keep the submodule in a different
+directory..
 
 ### Running tests
 
-Install the `toml-test` binary from the official [repo](https://github.com/toml-lang/toml-test):
+To verify correctness, use the official TOML test suite:
 
 ```sh
 go install github.com/toml-lang/toml-test/cmd/toml-test@v1.6.0
-```
-
-Then compile `tomlv`:
-```sh
-c3c bulid tomlv
-```
-and run the test suite as follows:
-```sh
+c3c build tomlv
 toml-test -- build/tomlv -j
 ```
-to verify that all tests pass.
 
 ### Examples
 
