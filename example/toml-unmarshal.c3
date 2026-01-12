@@ -1,25 +1,20 @@
 // c3c compile-run . example/toml-unmarshal.c3
 module tomltest;
-
-import std::collections::object;
-
-import std::io;
-import toml;
+import std::io, toml;
 
 struct Fruit
 {
 	String name;
-	int color;
+	int    color;
 	double price;
-	int items;
-	bool fresh;
-	Object*[3] ports;
+	int    items;
+	bool   fresh;
 }
 
 struct TomlConfig
 {
 	String title;
-	Fruit fruit;
+	Fruit  fruit;
 }
 
 fn void main()
@@ -32,15 +27,13 @@ fn void main()
 	color = 0xbeef
 	price = 1.32
 	items = 4
-	fresh = true
-	ports =[ 1, "hello", 3, 4]
-	`;
+	fresh = true`;
 
-	TomlData td = toml::from_string(s)!!;
-	defer td.free();
+	TomlData toml = toml::from_string(s)!!;
+	defer toml.free();
 
-	TomlConfig config;
-	td.unmarshal(&config)!!;
+	TomlConfig my_config;
+	toml.unmarshal(&my_config)!!;
 
-	io::printn(config);
+	io::printn(my_config);
 }

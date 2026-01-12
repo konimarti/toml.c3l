@@ -1,20 +1,17 @@
 module tomltest;
 
-import std::io;
-import toml;
+import std::io, toml;
 
-fn void main() => @assert_leak(true)
+fn void main() => @pool()
 {
-	String s =
-	`# toml config file
+	String s = `
+	# toml comment
 	title = "TOML example"
-
 	[database]
 	ports = [8000, 8001, 8002]`;
 
-	TomlData td = toml::from_string(s)!!;
-	defer td.free();
+	TomlData cfg = toml::from_string(s, tmem)!!;
 
-	io::printfn("title: %s", td["title"]!!);
-	io::printfn("ports: %s", td["database.ports"]!!);
+	io::printfn("title: %s", cfg.get("title")!!);
+	io::printfn("ports: %s", cfg.get("database.ports")!!);
 }

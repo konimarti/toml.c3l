@@ -113,21 +113,19 @@ toml-test -- build/tomlv -j
 ```cpp
 module app;
 
-import std::io;
-import toml;
+import std::io, toml;
 
-fn void main()
+fn void main() => @pool()
 {	
-	String s = ` 
-    # toml config file
-	title = "TOML example"
-	[database]
-	ports = [8000, 8001, 8002]`;
+    String s = `
+    # toml comment
+    title = "TOML example"
+    [database]
+    ports = [8000, 8001, 8002]`;
 
-	TomlData cfg = toml::from_string(s)!!;
-	defer cfg.free();
+    TomlData cfg = toml::from_string(s, tmem)!!;
 
-	io::printfn("title: %s", cfg.get("title") ?? "default title");
+	io::printfn("title: %s", cfg.get("title")!!);
 	io::printfn("ports: %s", cfg.get("database.ports")!!);
 }
 // Output:
@@ -141,26 +139,24 @@ fn void main()
 ```cpp
 module tomltest;
 
-import std::io;
-import toml;
+import std::io, toml;
 
 struct Fruit
 {
 	String name;
-	int color;
+	int    color;
 	double price;
-	int items;
-	bool fresh;
+	bool   fresh;
 }
 
 struct TomlConfig
 {
 	String title;
-	Fruit fruit;
+	Fruit  fruit;
 }
 
 fn void main()
-{	
+{
 	String s = `
 	title = "TOML example"
 
@@ -168,7 +164,6 @@ fn void main()
 	name = "apple"
 	color = 0xbeef
 	price = 1.32
-	items = 4
 	fresh = true`;
 
 	TomlData toml = toml::from_string(s)!!;
@@ -176,9 +171,9 @@ fn void main()
 
 	TomlConfig my_config;
 	toml.unmarshal(&my_config)!!;
-	
-	io::printn(config);
+
+	io::printn(my_config);
 }
 // Output:
-// { title: TOML example, fruit: { name: apple, color: 48879, price: 1.320000, items: 4, fresh: true } }
+// { title: TOML example, fruit: { name: apple, color: 48879, price: 1.320000, fresh: true } }
 ```
