@@ -168,7 +168,7 @@ fn Token? Lexer.read_number(&self, usz ndigits = 0)
 	{
 		self.pos += 1;
 	}
-	if (ndigits > 0 && self.pos - start != ndigits) return UNEXPECTED_DIGITS?;
+	if (ndigits > 0 && self.pos - start != ndigits) return UNEXPECTED_DIGITS~;
 	int number = self.input[start .. self.pos - 1].to_int()!;
 	return { NUMBER, number };
 }
@@ -191,14 +191,14 @@ fn Token? Lexer.next(&self, usz ndigits = 0)
 		case ' ': self.pos += 1; return { .type = SPACE };
 		default:
 			if (is_digit(c)) return self.read_number(ndigits)!;
-			return UNKNOWN_CHAR?;
+			return UNKNOWN_CHAR~;
 	}
 }
 
 fn void? Lexer.expect(&self, TokenType type, int *arg = null, usz ndigits = 0)
 {
 	Token tok = self.next(ndigits)!;
-	if (tok.type != type) return UNEXPECTED_TOKEN?;
+	if (tok.type != type) return UNEXPECTED_TOKEN~;
 	if (arg) *arg = tok.num;
 }
 
@@ -277,7 +277,7 @@ fn TomlDateTime? parse_string(String input)
 			parse_time(&lexer, &dt)!;
 
 		default:
-			return UNEXPECTED_TOKEN?;
+			return UNEXPECTED_TOKEN~;
 	}
 
 	return dt;

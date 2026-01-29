@@ -61,7 +61,7 @@ fn Object*? Parser.string(&self)
 		else
 		{
 			self.report_error("invalid quote; only use \" and '");
-			return parser::INVALID_QUOTE?;
+			return parser::INVALID_QUOTE~;
 		}
 
 	}
@@ -82,7 +82,7 @@ fn Object*? Parser.string(&self)
 		else
 		{
 			self.report_error("invalid quote; only use \" and '");
-			return parser::INVALID_QUOTE?;
+			return parser::INVALID_QUOTE~;
 		}
 
 	}
@@ -109,7 +109,7 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 	else if (is_cr(self.peek()))
 	{
 		self.advance()!;
-		if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+		if (!is_lf(self.peek())) return INVALID_NEWLINE~;
 		self.advance()!;
 	}
 
@@ -130,11 +130,11 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 		{
 			case len > 5:
 				self.report_error("terminal quote sequence is invalid; there are too many..");
-				return parser::INVALID_TERMINAL_QUOTES?;
+				return parser::INVALID_TERMINAL_QUOTES~;
 			case len >= 3:
 				break LOOP;
 			default:
-				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
+				if (self.at_end()) return parser::UNCLOSED_MULTILINE~;
 		}
 	}
 
@@ -164,7 +164,7 @@ fn void? Parser.mlb_content(&self, DString *buf)
 		else if (is_unicode(c))
 		{
 			Char32 codepoint = self.scan_unicode()!;
-			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII~;
 			buf.append_char32(codepoint);
 			continue;
 		}
@@ -178,7 +178,7 @@ fn void? Parser.mlb_content(&self, DString *buf)
 		else if (is_cr(c))
 		{
 			buf.append_char(self.advance()!);
-			if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+			if (!is_lf(self.peek())) return INVALID_NEWLINE~;
 			buf.append_char(self.advance()!);
 			continue;
 		}
@@ -204,7 +204,7 @@ fn void? Parser.mlb_content(&self, DString *buf)
 					case 'r':  buf.append_char('\r');
 					case '"':  buf.append_char('"');
 					case '\\': buf.append_char(ESCAPE);
-					default: return INVALID_ESCAPE_SEQUENCE?;
+					default: return INVALID_ESCAPE_SEQUENCE~;
 				}
 				if (n == 0) continue;
 
@@ -219,7 +219,7 @@ fn void? Parser.mlb_content(&self, DString *buf)
 					else
 					{
 						self.report_error("invalid escaped unicode sequence");
-						return parser::INVALID_ESCAPE_UNICODE?;
+						return parser::INVALID_ESCAPE_UNICODE~;
 					}
 				}
 
@@ -227,7 +227,7 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				uint codepoint = string::tformat("0x%s", self.s[start:n]).to_int()!;
 
 				// Verify that it is a scalar Unicode codepoint
-				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE?;
+				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE~;
 
 				// Add codepoint to buffer
 				buf.append_char32(codepoint);
@@ -238,13 +238,13 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				// non-escaped-terminal \ must be the last
 				// non-whitespace character
 				while (is_ws(self.peek())) self.advance()!;
-				if (!is_lf(self.peek()) && !is_cr(self.peek())) return INVALID_LINE_ENDING_BACKSLASH?;
+				if (!is_lf(self.peek()) && !is_cr(self.peek())) return INVALID_LINE_ENDING_BACKSLASH~;
 				while (is_ws(self.peek()) || is_lf(self.peek()) || is_cr(self.peek()))
 				{
 					if (is_cr(self.peek()))
 					{
 						self.advance()!;
-						if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+						if (!is_lf(self.peek())) return INVALID_NEWLINE~;
 					}
 					self.advance()!;
 				}
@@ -256,7 +256,7 @@ fn void? Parser.mlb_content(&self, DString *buf)
 
 		if (c == '"') break LOOP;;
 
-		return INVALID_STRING?;
+		return INVALID_STRING~;
 	}
 }
 
@@ -291,7 +291,7 @@ fn Object*? Parser.basic_string(&self) => @pool()
 		if (is_unicode(c))
 		{
 			Char32 codepoint = self.scan_unicode()!;
-			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII~;
 			buf.append_char32(codepoint);
 			continue;
 		}
@@ -316,7 +316,7 @@ fn Object*? Parser.basic_string(&self) => @pool()
 					case 'r':  buf.append_char('\r');
 					case '"':  buf.append_char('"');
 					case '\\': buf.append_char(ESCAPE);
-					default: return INVALID_ESCAPE_SEQUENCE?;
+					default: return INVALID_ESCAPE_SEQUENCE~;
 				}
 				if (n == 0) continue;
 
@@ -331,7 +331,7 @@ fn Object*? Parser.basic_string(&self) => @pool()
 					else
 					{
 						self.report_error("invalid escaped unicode sequence");
-						return parser::INVALID_ESCAPE_UNICODE?;
+						return parser::INVALID_ESCAPE_UNICODE~;
 					}
 				}
 
@@ -339,7 +339,7 @@ fn Object*? Parser.basic_string(&self) => @pool()
 				uint codepoint = string::tformat("0x%s", self.s[start:n]).to_int()!;
 
 				// Verify that it is a scalar Unicode codepoint
-				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE?;
+				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE~;
 
 				// Add codepoint to buffer
 				buf.append_char32(codepoint);
@@ -349,14 +349,14 @@ fn Object*? Parser.basic_string(&self) => @pool()
 			else
 			{
 				self.report_error("invalid escape sequence");
-				return parser::INVALID_ESCAPE_SEQUENCE?;
+				return parser::INVALID_ESCAPE_SEQUENCE~;
 			}
 		}
 
 		if (self.must('"')) break LOOP;
 
 		self.report_error("missing closing quote \"");
-		return parser::UNCLOSED_QUOTE?;
+		return parser::UNCLOSED_QUOTE~;
 	}
 
 	return object::new_string(buf.str_view(), self.allocator);
@@ -381,7 +381,7 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 	else if (is_cr(self.peek()))
 	{
 		self.advance()!;
-		if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+		if (!is_lf(self.peek())) return INVALID_NEWLINE~;
 		self.advance()!;
 	}
 
@@ -402,11 +402,11 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 		{
 			case len > 5:
 				self.report_error("terminal apostrophe sequence is invalid; there are too many..");
-				return parser::INVALID_TERMINAL_QUOTES?;
+				return parser::INVALID_TERMINAL_QUOTES~;
 			case len >= 3:
 				break LOOP;
 			default:
-				if (self.at_end()) return parser::UNCLOSED_MULTILINE?;
+				if (self.at_end()) return parser::UNCLOSED_MULTILINE~;
 		}
 	}
 
@@ -414,7 +414,7 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 	if (buf.len() < 3)
 	{
 		self.report_error("multi-line string is not long enough; did add three apostrophes on both sides?");
-		return parser::MULTILINE_STRING_TOO_SHORT?;
+		return parser::MULTILINE_STRING_TOO_SHORT~;
 	}
 
 	return object::new_string(buf.str_view().strip_end(`'''`), self.allocator);
@@ -441,7 +441,7 @@ fn void? Parser.mll_content(&self, DString *buf)
 		else if (is_unicode(c))
 		{
 			Char32 codepoint = self.scan_unicode()!;
-			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII~;
 			buf.append_char32(codepoint);
 			continue;
 		}
@@ -453,7 +453,7 @@ fn void? Parser.mll_content(&self, DString *buf)
 		else if (is_cr(c))
 		{
 			buf.append_char(self.advance()!);
-			if (!is_lf(self.peek())) return INVALID_NEWLINE?;
+			if (!is_lf(self.peek())) return INVALID_NEWLINE~;
 			buf.append_char(self.advance()!);
 			continue;
 		}
@@ -463,7 +463,7 @@ fn void? Parser.mll_content(&self, DString *buf)
 		}
 		else
 		{
-			return INVALID_LITERAL?;
+			return INVALID_LITERAL~;
 		}
 	}
 }
@@ -490,7 +490,7 @@ fn Object*? Parser.literal_string(&self) => @pool()
 		else if (is_unicode(c))
 		{
 			Char32 codepoint = self.scan_unicode()!;
-			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII?;
+			if (!is_non_ascii(codepoint)) return INVALID_NON_ASCII~;
 			buf.append_char32(codepoint);
 		}
 		else
@@ -498,7 +498,7 @@ fn Object*? Parser.literal_string(&self) => @pool()
 			if (!self.must('\''))
 			{
 				self.report_error("missing closing apostrophe '");
-				return parser::UNCLOSED_QUOTE?;
+				return parser::UNCLOSED_QUOTE~;
 			}
 			break LOOP;
 		}

@@ -69,14 +69,14 @@ fn Object*? Parser.number_or_datetime(&self) => @pool()
 		{
 			if (str.len >= 3 && str[1] == '0' && ascii::is_digit(str[2]))
 			{
-				return INVALID_LEADING_ZERO?;
+				return INVALID_LEADING_ZERO~;
 			}
 		}
 		else
 		{
 			if (str.len >= 2 && str[0] == '0' && ascii::is_digit(str[1]))
 			{
-				return INVALID_LEADING_ZERO?;
+				return INVALID_LEADING_ZERO~;
 			}
 		}
 	}
@@ -92,10 +92,10 @@ fn Object*? Parser.number_or_datetime(&self) => @pool()
 			{
 				return object::new_string(str, self.allocator);
 			}
-			return INVALID_DATETIME?;
+			return INVALID_DATETIME~;
 		default:
 			self.report_error("invalid token type in parsing a number of a datetime.");
-			return parser::INVALID_TOKEN_TYPE?;
+			return parser::INVALID_TOKEN_TYPE~;
 	}
 }
 
@@ -124,7 +124,7 @@ fn void? Parser.integer(&self, Token *tok)
 	switch (self.peek())
 	{
 		case '_':
-			if (!self.valid_surround(self.peek())) return INVALID_UNDERSCORE?;
+			if (!self.valid_surround(self.peek())) return INVALID_UNDERSCORE~;
 			self.advance()!;
 			self.integer(tok)!;
 		case '+':
@@ -132,15 +132,15 @@ fn void? Parser.integer(&self, Token *tok)
 			tok.s.append_char(self.advance()!);
 			self.integer(tok)!;
 		case 'x':
-			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
+			if (tok.has_sign) return UNSIGNED_WITH_SIGN~;
 			tok.s.append_char(self.advance()!);
 			self.hex_int(tok.s)!;
 		case 'o':
-			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
+			if (tok.has_sign) return UNSIGNED_WITH_SIGN~;
 			tok.s.append_char(self.advance()!);
 			self.oct_int(tok.s)!;
 		case 'b':
-			if (tok.has_sign) return UNSIGNED_WITH_SIGN?;
+			if (tok.has_sign) return UNSIGNED_WITH_SIGN~;
 			tok.s.append_char(self.advance()!);
 			self.bin_int(tok.s)!;
 		case 'n':
@@ -190,7 +190,7 @@ fn void? Parser.parse_float(&self, Token *tok)
 	switch (self.peek())
 	{
 		case '_':
-			if (!self.valid_surround(self.peek())) return INVALID_UNDERSCORE?;
+			if (!self.valid_surround(self.peek())) return INVALID_UNDERSCORE~;
 			self.advance()!;
 		case '.':
 		case '+':
@@ -198,7 +198,7 @@ fn void? Parser.parse_float(&self, Token *tok)
 		case 'e':
 		case 'E':
 		case '0'..'9':
-			if (self.peek() == '.' && !self.valid_surround(self.peek())) return INVALID_UNDERSCORE?;
+			if (self.peek() == '.' && !self.valid_surround(self.peek())) return INVALID_UNDERSCORE~;
 			tok.s.append_char(self.advance()!);
 		case 'n':
 			if (self.match("nan")!) tok.s.append_string("nan");
@@ -248,7 +248,7 @@ fn void? Parser.parse_int(&self, DString s, Accept accept)
 			case accept(c):
 				s.append_char(self.advance()!);
 			case c == '_':
-				if (!self.valid_surround(c, accept)) return INVALID_UNDERSCORE?;
+				if (!self.valid_surround(c, accept)) return INVALID_UNDERSCORE~;
 				self.advance()!;
 			default:
 				break LOOP;

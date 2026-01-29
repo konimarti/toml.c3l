@@ -31,7 +31,7 @@ fn Object*? Parser.array(&self)
 		{
 			case ',': self.advance()!; continue;
 			case ']': self.advance()!; break LOOP;
-			default: return INVALID_ARRAY?;
+			default: return INVALID_ARRAY~;
 		}
 	}
 

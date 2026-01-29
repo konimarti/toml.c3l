@@ -192,7 +192,7 @@ macro TomlData? parse(input, Allocator allocator = mem, bool verbose = true)
 		$case char[]:
 			return from_string((String)input[..], allocator, verbose);
 		$default:
-			return INVALID_INPUT_FORMAT?;
+			return INVALID_INPUT_FORMAT~;
 	$endswitch
 }
 macro TomlData? tparse(input, bool verbose = true) => load(input, tmem, verbose);

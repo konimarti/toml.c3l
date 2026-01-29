@@ -34,7 +34,7 @@ macro void? unmarshal_obj(t, m)
 			if (!arr.is_array())
 			{
 				io::eprintfn("TOML Unmarshal Error: should field '%s' really be an array?", $x.nameof);
-				return UNSUPPORTED_TYPE?;
+				return UNSUPPORTED_TYPE~;
 			}
 
 			var $ElementType = $typefrom($x.typeid.inner);
@@ -57,7 +57,7 @@ macro void? unmarshal_obj(t, m)
 				}
 			$else
 				io::eprintfn("TOML Unmarshal Error: type of field '%s' is unsupported; use 'Object*' instead.", $x.nameof);
-				return UNSUPPORTED_TYPE?;
+				return UNSUPPORTED_TYPE~;
 			$endif
 
 		$default:
