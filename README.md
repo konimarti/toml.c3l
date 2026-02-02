@@ -64,15 +64,16 @@ any of the `toml::from_*` functions.
 
 ### Decoding into Structs
 
-Parsed TOML data can be directly unmarshalled into a user-defined struct using
-the `TomlData.unmarshal` macro:
+Parsed TOML data can be directly decoded into a user-defined struct `MyStruct`using
+`toml::decode{MyStruct}`:
 
-```cpp
+```c3
 TomlData toml = toml::from_string(s)!!;
-
-MyConfig my_config;
-toml.unmarshal(&my_config)!!;
+MyConfig my_config = toml::decode{MyConfig}(toml)!!;
 ```
+
+Decoding into arrays is currently only implemented for fixed-sized arrays of
+type `Object*`.
 
 For a more detailed example, see below.
 
@@ -110,7 +111,7 @@ toml-test -- build/tomlv -j
 
 #### Parse TOML from String
 
-```cpp
+```c3
 module app;
 
 import std::io, toml;
@@ -136,7 +137,7 @@ fn void main() => @pool()
 
 #### Parse TOML and decode to struct
 
-```cpp
+```c3
 module tomltest;
 
 import std::io, toml;
@@ -169,8 +170,7 @@ fn void main()
 	TomlData toml = toml::from_string(s)!!;
 	defer toml.free();
 
-	TomlConfig my_config;
-	toml.unmarshal(&my_config)!!;
+	TomlConfig my_config = toml::decode{TomlConfig}(toml);
 
 	io::printn(my_config);
 }

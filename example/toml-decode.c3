@@ -1,6 +1,6 @@
 // c3c compile-run . example/toml-unmarshal.c3
 module tomltest;
-import std::io, toml;
+import std::io, toml, std::collections;
 
 struct Fruit
 {
@@ -25,15 +25,14 @@ fn void main()
 	[fruit]
 	name = "apple"
 	color = 0xbeef
-	price = 1.32
-	items = 4
+	price = 3.14566437474
+	items = 5
 	fresh = true`;
 
 	TomlData toml = toml::from_string(s)!!;
 	defer toml.free();
 
-	TomlConfig my_config;
-	toml.unmarshal(&my_config)!!;
+	TomlConfig my_config = toml::decode{TomlConfig}(toml)!!;
 
 	io::printn(my_config);
 }

@@ -1,14 +1,12 @@
 module toml;
 
-import std::io;
-import std::collections::map;
-import std::collections::object;
+import std::io, std::collections::map, std::collections::object;
 
 faultdef UNSUPPORTED_TYPE;
 
-macro void? unmarshal_obj(t, m)
+macro toml_decode_to_type($Type, toml) @private
 {
-	var $Type = $typeof(*t);
+	$Type t;
 
 	$foreach $x : $Type.membersof:
 
@@ -18,22 +16,22 @@ macro void? unmarshal_obj(t, m)
 		// io::printfn("typeid: %s", $x.typeid.nameof);
 		// io::printfn("get value of membersof $x: %s", $x.get(*t));
 
-		if (m.has_key($x.nameof))
+		if (toml.has_key($x.nameof))
 		{
 
 		$switch $x.kindof:
 
 		$case TypeKind.STRUCT:
 
-			unmarshal_obj(&$x.get(*t), m.get($x.nameof)!)!;
+			t.$eval($x.nameof) = toml_decode_to_type($typefrom($x.typeid), toml.get($x.nameof)!)!;
 
 		$case TypeKind.VECTOR:
 		$case TypeKind.ARRAY:
 
-			Object* arr = m.get($x.nameof)!;
+			Object* arr = toml.get($x.nameof)!;
 			if (!arr.is_array())
 			{
-				io::eprintfn("TOML Unmarshal Error: should field '%s' really be an array?", $x.nameof);
+				io::eprintfn("TOML Decode Error: should field '%s' really be an array?", $x.nameof);
 				return UNSUPPORTED_TYPE~;
 			}
 
@@ -46,17 +44,21 @@ macro void? unmarshal_obj(t, m)
 			// io::printfn("type of array[0]: %s", $ElementType.nameof);
 
 			$if $ElementType.typeid == Object*.typeid:
+				if (arr.get_len() != $x.typeid.len)
+				{
+					io::eprintfn("TOML Decode Warning: array lengths differ for %s.", $x.nameof);
+				}
 				usz n = min(arr.get_len(), $x.typeid.len);
 				if (n < arr.get_len())
 				{
-					io::eprintfn("TOML Unmarshal Warning: target array is smaller than config values!", $x.nameof);
+					io::eprintfn("TOML Decode Warning: target array is smaller than config values: %s", $x.nameof);
 				}
 				for (usz i = 0; i < n; i++)
 				{
-					$x.get(*t)[i] = arr.get_at(i);
+					$x.get(t)[i] = arr.get_at(i);
 				}
 			$else
-				io::eprintfn("TOML Unmarshal Error: type of field '%s' is unsupported; use 'Object*' instead.", $x.nameof);
+				io::eprintfn("TOML Decode Error: type of field '%s' is unsupported; use 'Object*' instead.", $x.nameof);
 				return UNSUPPORTED_TYPE~;
 			$endif
 
@@ -69,23 +71,23 @@ macro void? unmarshal_obj(t, m)
 
 				$case types::is_int($TargetType):
 
-					t.$eval($name) = m.get_int($name)!;
+					t.$eval($name) = toml.get_int($name)!;
 
 				$case types::is_float($TargetType):
 
-					t.$eval($name) = m.get_float($name)!;
+					t.$eval($name) = toml.get_float($name)!;
 
 				$case types::is_bool($TargetType):
 
-					t.$eval($name) = m.get_bool($name)!;
+					t.$eval($name) = toml.get_bool($name)!;
 
 				$case $TargetType.typeid == String.typeid:
 
-					t.$eval($name) = m.get_string($name)!;
+					t.$eval($name) = toml.get_string($name)!;
 
 			$default:
 
-				t.$eval($name) = m.get($name)!;
+				t.$eval($name) = toml.get($name)!;
 
 			$endswitch
 
@@ -94,4 +96,6 @@ macro void? unmarshal_obj(t, m)
 		}
 
 	$endforeach
+
+	return t;
 }

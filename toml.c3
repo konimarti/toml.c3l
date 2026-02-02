@@ -178,8 +178,6 @@ fn TomlData? from_string(String s, Allocator allocator = mem, bool verbose = tru
 	};
 }
 
-macro void? TomlData.unmarshal(&self, t) => unmarshal_obj(t, self.table);
-
 macro TomlData? parse(input, Allocator allocator = mem, bool verbose = true)
 {
 	$switch $typeof(input):
@@ -196,4 +194,9 @@ macro TomlData? parse(input, Allocator allocator = mem, bool verbose = true)
 	$endswitch
 }
 macro TomlData? tparse(input, bool verbose = true) => load(input, tmem, verbose);
+
+fn Type? decode(TomlData toml_data) <Type>
+{
+	return toml_decode_to_type(Type, toml_data.table);
+}
 
