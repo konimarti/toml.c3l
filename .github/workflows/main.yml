@@ -1,28 +1,46 @@
 name: CI
-
 on:
   push:
-    branches: [ master ]
+    branches: [ master, ci_testing ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'C3 compiler version to use'
+        required: false
+        default: 'v0.7.10'
+
+env:
+  C3_VERSION: v0.7.10
 
 jobs:
-
   build-linux:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
-      # Don't abort runners if a single one fails
       fail-fast: false
-
     steps:
       - uses: actions/checkout@v4
-      - uses: radekm/setup-c3@v2
-        with:
-          version: v0.7.9
-          # version: latest-prerelease-tag
+
+      - name: Setup C3
+        shell: bash
+        run: |
+          VERSION="${{ github.event.inputs.version || env.C3_VERSION }}"
+          mkdir -p /opt/c3
+          wget -O /tmp/c3.tar.gz "https://github.com/c3lang/c3c/releases/download/${VERSION}/c3-linux.tar.gz"
+          tar -xvzf /tmp/c3.tar.gz -C /opt/c3 --strip-components=1
+          echo "/opt/c3" >> "$GITHUB_PATH"
+
+      - name: Run unit tests
+        run: |
+          c3c test
+
       - uses: actions/setup-go@v4
+
       - name: Install toml-test
-        run: go install github.com/toml-lang/toml-test/cmd/toml-test@v1.6.0
+        run: |
+          go install github.com/toml-lang/toml-test/cmd/toml-test@v1.6.0
+
       - name: Compile and run toml-test suite
         run: |
           c3c build tomlv
