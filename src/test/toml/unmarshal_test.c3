@@ -71,15 +71,12 @@ struct TomlDoc
 	Servers servers;
 }
 
-fn void test_unmarshal_toml_doc() @test => @assert_leak(true)
+fn void test_decode_toml_doc() @test => @assert_leak(true)
 {
-	toml::parser::Parser scan;
-	scan.init(TOML_DOC, mem);
-	Object* obj = scan.toml()!!;
-	defer obj.free();
+	TomlData data = toml::from_string(TOML_DOC, mem)!!;
+	defer data.free();
 
-	TomlDoc t;
-	toml::unmarshal_obj(&t, obj)!!;
+	TomlDoc t = toml::decode{TomlDoc}(data)!!;
 
 	assert(t.title == "TOML Example");
 	assert(t.owner.name == "Tom Preston-Werner");

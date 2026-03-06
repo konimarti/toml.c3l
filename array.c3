@@ -15,7 +15,7 @@ fn Object*? Parser.array(&self)
 	self.must('[');
 
 	Object* arr = object::new_obj(self.allocator);
-	arr.init_array_if_needed();
+	object::object_init_array_if_needed(arr);
 
 	while LOOP: (1)
 	{
