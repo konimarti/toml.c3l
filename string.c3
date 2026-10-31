@@ -48,7 +48,7 @@ fn Object*? Parser.string(&self)
 	if (self.must(quote)) {
 
 		// if no third quote is found, then return empty string.
-		if (!self.must(quote)) return object::new_string("", self.allocator);
+		if (!self.must(quote)) return object::new_string(self.allocator, "");
 
 		if (quote == '"')
 		{
@@ -138,7 +138,7 @@ fn Object*? Parser.ml_basic_string(&self) => @pool()
 		}
 	}
 
-	return object::new_string(buf.str_view().strip_end(`"""`), self.allocator);
+	return object::new_string(self.allocator, buf.str_view().strip_suffix(`"""`));
 }
 
 // mlb-content = mlb-char / newline / mlb-escaped-nl
@@ -224,7 +224,7 @@ fn void? Parser.mlb_content(&self, DString *buf)
 				}
 
 				// Parse Unicode escape sequence into unicode codepoint
-				uint codepoint = string::tformat("0x%s", self.s[start:n]).to_int()!;
+				uint codepoint = (uint)string::tformat("0x%s", self.s[start:n]).to_int()!;
 
 				// Verify that it is a scalar Unicode codepoint
 				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE~;
@@ -336,7 +336,7 @@ fn Object*? Parser.basic_string(&self) => @pool()
 				}
 
 				// Parse Unicode escape sequence into unicode codepoint
-				uint codepoint = string::tformat("0x%s", self.s[start:n]).to_int()!;
+				uint codepoint = (uint)string::tformat("0x%s", self.s[start:n]).to_int()!;
 
 				// Verify that it is a scalar Unicode codepoint
 				if (!is_scalar_unicode(codepoint)) return INVALID_UNICODE~;
@@ -359,7 +359,7 @@ fn Object*? Parser.basic_string(&self) => @pool()
 		return parser::UNCLOSED_QUOTE~;
 	}
 
-	return object::new_string(buf.str_view(), self.allocator);
+	return object::new_string(self.allocator, buf.str_view());
 }
 
 // ml-literal-string = ml-literal-string delim [ newline ] ml-literal-body
@@ -417,7 +417,7 @@ fn Object*? Parser.ml_literal_string(&self) => @pool()
 		return parser::MULTILINE_STRING_TOO_SHORT~;
 	}
 
-	return object::new_string(buf.str_view().strip_end(`'''`), self.allocator);
+	return object::new_string(self.allocator, buf.str_view().strip_suffix(`'''`));
 }
 
 // mll-content = mll-char / newline
@@ -504,12 +504,12 @@ fn Object*? Parser.literal_string(&self) => @pool()
 		}
 	}
 
-	return object::new_string(buf.str_view(), self.allocator);
+	return object::new_string(self.allocator, buf.str_view());
 }
 
 fn Char32? Parser.scan_unicode(&self)
 {
-	usz len = math::min(4, (int)(self.s.len - self.current));
+	sz len = math::min(4, (int)(self.s.len - self.current));
 	Char32 codepoint = conv::utf8_to_char32(&self.s[self.current], &len)!;
 	while (len--) self.advance()!;
 	return codepoint;

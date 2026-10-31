@@ -1,6 +1,6 @@
 module toml::parser;
 
-import std::ascii;
+import std::core::ascii;
 import std::collections::object;
 
 import std::io; // debugging
@@ -84,13 +84,13 @@ fn Object*? Parser.number_or_datetime(&self) => @pool()
 	switch (tok.type)
 	{
 		case INTEGER:
-			return object::new_int(str.to_int128()!, self.allocator);
+			return object::new_int(self.allocator, str.to_int128()!);
 		case FLOAT:
-			return object::new_float(str.to_double()!, self.allocator);
+			return object::new_float(self.allocator, str.to_double()!);
 		case DATETIME:
 			if (try dt = toml::time::parse(str) && dt.valid_ranges())
 			{
-				return object::new_string(str, self.allocator);
+				return object::new_string(self.allocator, str);
 			}
 			return INVALID_DATETIME~;
 		default:

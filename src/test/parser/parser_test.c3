@@ -300,22 +300,22 @@ fn void parser_value_float() @test
 		{
 			.name = "float nan",
 			.input = `nan`,
-			.want = float.nan,
+			.want = float::nan,
 		},
 		{
 			.name = "float -nan",
 			.input = `-nan`,
-			.want = -float.nan,
+			.want = -float::nan,
 		},
 		{
 			.name = "float +inf",
 			.input = `+inf`,
-			.want = float.inf,
+			.want = float::inf,
 		},
 		{
 			.name = "float -inf",
 			.input = `-inf`,
-			.want = -float.inf,
+			.want = -float::inf,
 		},
 	};
 

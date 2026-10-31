@@ -33,9 +33,9 @@ const OFFSET_FMT @local    = "%02d:%02d";
 const DATE_TIME_FMT @local = "%04d-%02d-%02d %02d:%02d:%02d";
 
 fn int TomlDateTime.offset_seconds(&self) => self.offset_hour * 3600 + self.offset_minute * 60;
-fn usz? TomlDateTime.to_format(&self, Formatter* f) @dynamic
+fn sz? TomlDateTime.to_format(&self, Formatter* f) @dynamic
 {
-	usz n;
+	sz n;
 	switch (self.kind)
 	{
 		case DATE_ONLY:
@@ -104,12 +104,12 @@ fn DateTime? TomlDateTime.date_time(&self)
 		case DATE_ONLY:
 		case LOCAL_DATE_TIME:
 		case OFFSET_DATE_TIME:
-			dt = datetime::from_date(
-				self.year, Month.from_ordinal(self.month-1), self.day,
+			dt = datetime::at(
+				self.year, Month::from_ordinal(self.month-1), self.day,
 				self.hour, self.minute, self.second, 0);
 			dt.usec = self.nanosecond / 1000;
 		case TIME_ONLY:
-			dt = datetime::from_date(
+			dt = datetime::at(
 				0, JANUARY, 1,
 				self.hour, self.minute, self.second, 0);
 			dt.usec = self.nanosecond / 1000;

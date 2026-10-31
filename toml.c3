@@ -14,7 +14,7 @@ struct TomlData (Printable)
 	Allocator allocator;
 }
 
-fn usz? TomlData.to_format(&self, Formatter* formatter) @dynamic
+fn sz? TomlData.to_format(&self, Formatter* formatter) @dynamic
 {
 	Object *object = self.table;
 	if (object == null) {
@@ -63,7 +63,7 @@ fn String tescape_json(String s)
 	return buf.str_view();
 }
 
-fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
+fn sz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 {
 	switch (self.type)
 	{
@@ -89,7 +89,7 @@ fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 		case bool:
 			return formatter.printf(`{"type":"bool","value":"%s"}`, self.b ? "true" : "false")!;
 		case ObjectInternalList:
-			usz n = formatter.printf("[")!;
+			sz n = formatter.printf("[")!;
 			foreach (i, ol : self.array)
 			{
 				if (i > 0) n += formatter.printf(",")!;
@@ -99,7 +99,7 @@ fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 			n += formatter.printf("]")!;
 			return n;
 		case ObjectInternalMap:
-			usz n = formatter.printf("{")!;
+			sz n = formatter.printf("{")!;
 			@stack_mem(1024; Allocator mem)
 			{
 				foreach (i, key : self.map.keys(mem))
@@ -113,7 +113,7 @@ fn usz? to_tagged_json(Object *self, Formatter* formatter) => @pool()
 			n += formatter.printf("}")!;
 			return n;
 		default:
-			switch (self.type.kindof)
+			switch (self.type.kind)
 			{
 				case SIGNED_INT:
 					return formatter.printf(`{"type":"integer","value":"%d"}`, (int128)self.i)!;
@@ -146,7 +146,7 @@ fn void TomlData.free(&self)
 	{
 		self.table.free();
 	}
-	allocator::free(self.allocator, self.input);
+	alloc::free(self.allocator, self.input);
 }
 
 fn TomlData? from_file(String filename, Allocator allocator = mem, bool verbose = true)
@@ -180,7 +180,7 @@ fn TomlData? from_string(String s, Allocator allocator = mem, bool verbose = tru
 
 macro TomlData? parse(input, Allocator allocator = mem, bool verbose = true)
 {
-	$switch $typeof(input):
+	$switch $Typeof(input):
 		$case InStream:
 			return from_stream(input, allocator, verbose);
 		$case DString:

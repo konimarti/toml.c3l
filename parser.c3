@@ -95,7 +95,7 @@ fn bool Parser.at_end(&self)
 
 fn void Parser.report_error(&self, String msg, bool full_report = false)
 {
-	isz start, end;
+	sz start, end;
 
 	if (!self.verbose) return;
 
@@ -103,7 +103,7 @@ fn void Parser.report_error(&self, String msg, bool full_report = false)
 
 	if (full_report)
 	{
-		start = self.current - self.column + 1;
+		start = (sz)(self.current - self.column + 1);
 		if (start < 0 || start >= self.s.len) return;
 
 		end = self.s.len - 1;
@@ -608,7 +608,7 @@ fn Object*? Parser.toml(&self) => @pool()
 	self.array_of_tables.tinit();
 
 	fault last_error;
-	int max_lines = int.max;
+	int max_lines = int::max;
 	while LOOP: (max_lines--) {
 		if (catch err = self.expression(root))
 		{
