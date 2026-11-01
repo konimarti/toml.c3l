@@ -8,6 +8,9 @@ programming language](http://c3-lang.org).
 * Fully passes the official [toml-test suite](https://github.com/toml-lang/toml-test/).
 * Includes a command-line TOML validator tool `tomlv` for syntax checking.
 
+Requires [c3c](https://github.com/c3lang/c3c) v0.8.5 or newer. Use an earlier
+release of this library for older compiler versions.
+
 ### Usage
 
 TOML configuration files can be parsed from a `String`, an `InStream` (e.g.
