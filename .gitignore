@@ -3,3 +3,8 @@ testrun
 app
 linter
 tomltest
+obj
+tags
+toml-test*
+Makefile
+test.sh
